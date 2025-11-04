@@ -1,5 +1,6 @@
 ## v1.2.1
-![Static Badge](https://img.shields.io/badge/:badgeContent)
+[![Static Badge](https://img.shields.io/badge/:badgeContent)](https://img.shields.io/badge/:badgeContent
+)
 
 ### ✨ Features
 - 支持 UUIDv7 主键，数据库写入性能提升 30%
