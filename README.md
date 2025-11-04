@@ -1,4 +1,4 @@
-![Static Badge](https://img.shields.io/badge/v1.2.1%20the%20message-8A2BE2)
+![Static Badge](https://img.shields.io/badge/v1.2.1)
 
 ### ✨ Features
 - 支持 UUIDv7 主键，数据库写入性能提升 30%
