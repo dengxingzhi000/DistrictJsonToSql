@@ -1,21 +1,16 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>disable</ImplicitUsings>
     <Nullable>disable</Nullable>
     <LangVersion>latest</LangVersion>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
 
-  <!--
-    P0/P1 阶段生产项目仍是旧式（非 SDK-style）csproj，无法 ProjectReference，
-    因此这里直接编译生产源码文件；P2 迁移到 net10-windows 后改用 ProjectReference。
-  -->
   <ItemGroup>
-    <Compile Include="..\..\DistrictJsonToSql\DistrictItem.cs" Link="Linked\DistrictItem.cs" />
-    <Compile Include="..\..\DistrictJsonToSql\GuidV7Generator.cs" Link="Linked\GuidV7Generator.cs" />
-    <Compile Include="..\..\DistrictJsonToSql\SqlGenerator.cs" Link="Linked\SqlGenerator.cs" />
+    <ProjectReference Include="..\..\DistrictJsonToSql\DistrictJsonToSql.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -26,7 +21,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
     <PackageReference Include="xunit" Version="2.9.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
   </ItemGroup>

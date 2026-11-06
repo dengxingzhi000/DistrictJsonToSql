@@ -1,47 +1,49 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Threading;
+using System.Linq;
+using System.Text.RegularExpressions;
 using Xunit;
 
 namespace DistrictJsonToSql.Tests
 {
     /// <summary>
-    /// P1 修复的三个缺陷的回归用例（P0 阶段以 Skip 记录，现全部启用）。
+    /// P1 修复的三个缺陷的回归用例，以及升级到 Guid.CreateVersion7() 之后的等价断言。
     /// </summary>
     public class RegressionTests
     {
         [Fact]
-        public void UuidV7_ShouldFollowRfc9562FieldLayout()
+        public void GeneratedGuids_ShouldFollowRfc9562FieldLayout()
         {
-            var generator = new GuidV7Generator();
+            var guids = ExtractGeneratedGuids();
 
-            var guid = generator.Generate();
-            var groups = guid.Split('-');
-
-            Assert.Equal(5, groups.Length);
-            Assert.Equal('7', groups[2][0]);
-            Assert.True("89ab".IndexOf(groups[3][0]) >= 0, "变体位必须在第四段首位: " + guid);
+            Assert.NotEmpty(guids);
+            foreach (var guid in guids)
+            {
+                var groups = guid.Split('-');
+                Assert.Equal(5, groups.Length);
+                Assert.Equal('7', groups[2][0]);
+                Assert.True("89ab".IndexOf(groups[3][0]) >= 0, "变体位必须在第四段首位: " + guid);
+            }
         }
 
         [Fact]
-        public void UuidV7_ShouldSortByGenerationTime()
+        public void GeneratedGuids_ShouldSortByGenerationOrder()
         {
-            var generator = new GuidV7Generator();
+            var guids = ExtractGeneratedGuids();
 
-            var first = generator.Generate();
-            Thread.Sleep(30);
-            var second = generator.Generate();
-
-            Assert.True(string.CompareOrdinal(first, second) < 0, first + " 应排在 " + second + " 之前");
+            for (var i = 1; i < guids.Count; i++)
+            {
+                Assert.True(
+                    string.CompareOrdinal(guids[i - 1], guids[i]) < 0,
+                    guids[i - 1] + " 应排在 " + guids[i] + " 之前");
+            }
         }
 
         [Fact]
-        public void UuidV7_FirstSixBytes_ShouldCarryCurrentTimestamp()
+        public void GeneratedGuids_ShouldCarryCurrentTimestamp()
         {
-            var generator = new GuidV7Generator();
-
-            var guid = generator.Generate();
+            var guid = ExtractGeneratedGuids()[0];
             var hex = guid.Replace("-", string.Empty).Substring(0, 12);
             var timestamp = Convert.ToInt64(hex, 16);
             var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
@@ -117,6 +119,29 @@ namespace DistrictJsonToSql.Tests
                     File.Delete(path);
                 }
             }
+        }
+
+        /// <summary>从生成的 SQL 中按出现顺序取出 guid 字面量。</summary>
+        private static List<string> ExtractGeneratedGuids()
+        {
+            var province = new DistrictItem
+            {
+                Code = "11",
+                Name = "北京市",
+                Children = new List<DistrictItem>
+                {
+                    new DistrictItem { Code = "1101", Name = "市辖区" },
+                    new DistrictItem { Code = "1102", Name = "县" }
+                }
+            };
+
+            var sql = SqlGenerator.GenerateSql(new List<DistrictItem> { province });
+
+            return Regex
+                .Matches(sql, "'([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})'::uuid")
+                .Cast<Match>()
+                .Select(m => m.Groups[1].Value)
+                .ToList();
         }
 
         /// <summary>构造一条到指定层级（1=省）的单链节点。</summary>

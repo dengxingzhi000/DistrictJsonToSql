@@ -20,8 +20,6 @@ namespace DistrictJsonToSql
 
         private const int MaxDepth = 4;
 
-        private static readonly GuidV7Generator GuidGenerator = new GuidV7Generator();
-
         /// <summary>
         /// 生成整份 SQL 脚本（含头部注释与分批 INSERT）。
         /// 输入不合法时抛 <see cref="ArgumentException"/>，消息里带节点路径。
@@ -54,7 +52,7 @@ namespace DistrictJsonToSql
 
             foreach (var district in items)
             {
-                var provinceGuid = GuidGenerator.Generate();
+                var provinceGuid = Guid.CreateVersion7().ToString();
                 var provinceSql = GenerateInsertStatement(provinceGuid, district.Code + "0000", district.Name, 1, null);
                 insertStatements.Add(provinceSql);
 
@@ -62,7 +60,7 @@ namespace DistrictJsonToSql
                 {
                     foreach (var city in district.Children)
                     {
-                        var cityGuid = GuidGenerator.Generate();
+                        var cityGuid = Guid.CreateVersion7().ToString();
                         var citySql = GenerateInsertStatement(cityGuid, city.Code + "00", city.Name, 2, district.Code + "0000");
                         insertStatements.Add(citySql);
 
@@ -70,7 +68,7 @@ namespace DistrictJsonToSql
                         {
                             foreach (var county in city.Children)
                             {
-                                var countyGuid = GuidGenerator.Generate();
+                                var countyGuid = Guid.CreateVersion7().ToString();
                                 var countySql = GenerateInsertStatement(countyGuid, county.Code, county.Name, 3, city.Code + "00");
                                 insertStatements.Add(countySql);
 
@@ -78,7 +76,7 @@ namespace DistrictJsonToSql
                                 {
                                     foreach (var street in county.Children)
                                     {
-                                        var streetGuid = GuidGenerator.Generate();
+                                        var streetGuid = Guid.CreateVersion7().ToString();
                                         var streetSql = GenerateInsertStatement(streetGuid, street.Code, street.Name, 4, county.Code);
                                         insertStatements.Add(streetSql);
                                     }
