@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Text;
 using System.Windows.Forms;
 using Newtonsoft.Json;
@@ -15,9 +14,6 @@ namespace DistrictJsonToSql
         private Button btnGenerate;
         private TextBox txtOutput;
         private Label lblStatus;
-
-        private static readonly GuidV7Generator _guidGen = new GuidV7Generator();
-        private static string GenerateGuidV7() => _guidGen.Generate();
 
         public MainForm()
         {
@@ -112,11 +108,11 @@ namespace DistrictJsonToSql
                     return;
                 }
 
-                string sql = GenerateSql(districts);
+                string sql = SqlGenerator.GenerateSql(districts);
                 txtOutput.Text = sql;
 
                 string sqlFileName = Path.ChangeExtension(txtFilePath.Text, ".sql");
-                File.WriteAllText(sqlFileName, sql, Encoding.UTF8);
+                SqlGenerator.WriteSqlFile(sqlFileName, sql);
 
                 lblStatus.Text = $"SQL生成完成，已保存到: {sqlFileName}";
                 MessageBox.Show($"SQL文件已生成：{sqlFileName}", "完成", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -128,136 +124,5 @@ namespace DistrictJsonToSql
             }
         }
 
-        private string GenerateSql(List<DistrictItem> districts)
-        {
-            var sqlBuilder = new StringBuilder();
-            sqlBuilder.AppendLine("-- 地域数据插入SQL");
-            sqlBuilder.AppendLine("-- 生成时间: " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
-            sqlBuilder.AppendLine();
-
-            var insertStatements = new List<string>();
-
-            foreach (var district in districts)
-            {
-                var provinceGuid = GenerateGuidV7();
-                var provinceSql = GenerateInsertStatement(provinceGuid, district.Code + "0000", district.Name, 1, null);
-                insertStatements.Add(provinceSql);
-
-                if (district.Children != null)
-                {
-                    foreach (var city in district.Children)
-                    {
-                        var cityGuid = GenerateGuidV7();
-                        var citySql = GenerateInsertStatement(cityGuid, city.Code + "00", city.Name, 2, district.Code + "0000");
-                        insertStatements.Add(citySql);
-
-                        if (city.Children != null)
-                        {
-                            foreach (var county in city.Children)
-                            {
-                                var countyGuid = GenerateGuidV7();
-                                var countySql = GenerateInsertStatement(countyGuid, county.Code, county.Name, 3, city.Code + "00");
-                                insertStatements.Add(countySql);
-
-                                if (county.Children != null)
-                                {
-                                    foreach (var street in county.Children)
-                                    {
-                                        var streetGuid = GenerateGuidV7();
-                                        var streetSql = GenerateInsertStatement(streetGuid, street.Code, street.Name, 4, county.Code);
-                                        insertStatements.Add(streetSql);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            var batchSize = 100;
-            for (int i = 0; i < insertStatements.Count; i += batchSize)
-            {
-                var batch = insertStatements.Skip(i).Take(batchSize);
-                sqlBuilder.AppendLine("INSERT INTO public.tb_district (guid, code, \"name\", district_type, parent_code) VALUES");
-                sqlBuilder.AppendLine(string.Join(",\n", batch) + ";");
-                sqlBuilder.AppendLine();
-            }
-
-            return sqlBuilder.ToString();
-        }
-
-        private string GenerateInsertStatement(string guid, string code, string name, int districtType, string parentCode)
-        {
-            var parentValue = parentCode == null ? "NULL" : $"'{parentCode}'";
-            return $"('{guid}'::uuid, '{code}', '{name.Replace("'", "''")}', {districtType}, {parentValue})";
-        }
-        private class GuidV7Generator
-        {
-            private readonly Random _random;
-            private long _lastTimestamp;
-            private int _counter;
-            private readonly object _lock = new object();
-
-            public GuidV7Generator()
-            {
-                _random = new Random();
-                _lastTimestamp = 0;
-                _counter = 0;
-            }
-
-            public string Generate()
-            {
-                lock (_lock)
-                {
-                    var currentTimestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-
-                    if (currentTimestamp == _lastTimestamp)
-                    {
-                        _counter++;
-                        if (_counter > 0xFFF)
-                        {
-                            currentTimestamp++;
-                            _counter = 0;
-                        }
-                    }
-                    else
-                    {
-                        _counter = 0;
-                    }
-
-                    _lastTimestamp = currentTimestamp;
-
-                    var guidBytes = new byte[16];
-
-                    var timestampBytes = BitConverter.GetBytes(currentTimestamp);
-                    if (BitConverter.IsLittleEndian)
-                        Array.Reverse(timestampBytes);
-                    Array.Copy(timestampBytes, 2, guidBytes, 0, 6);
-
-                    guidBytes[6] = (byte)((_counter >> 8) & 0x0F | 0x70);
-                    guidBytes[7] = (byte)(_counter & 0xFF);
-
-                    var randomBytes = new byte[8];
-                    _random.NextBytes(randomBytes);
-                    randomBytes[0] = (byte)((randomBytes[0] & 0x3F) | 0x80);
-                    Array.Copy(randomBytes, 0, guidBytes, 8, 8);
-
-                    return new Guid(guidBytes).ToString();
-                }
-            }
-        }
     }
-
-    public class DistrictItem
-    {
-        [JsonProperty("code")]
-        public string Code { get; set; }
-
-        [JsonProperty("name")]
-        public string Name { get; set; }
-
-        [JsonProperty("children")]
-        public List<DistrictItem> Children { get; set; }
-    }
-
 }
