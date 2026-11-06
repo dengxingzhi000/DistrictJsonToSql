@@ -7,12 +7,11 @@ using System.Text;
 namespace DistrictJsonToSql
 {
     /// <summary>
-    /// 行政区划 JSON 到 PostgreSQL INSERT 脚本的纯转换逻辑。
-    /// 不依赖 WinForms，供界面层与单元测试共用。
+    /// 行政区划 JSON 到 INSERT 脚本的纯转换逻辑。
+    /// 不依赖 WinForms；方言由 <see cref="ISqlDialect"/> 决定，表名/列名/批量大小由配置决定。
     /// </summary>
     public static class SqlGenerator
     {
-        public const string TableName = "public.tb_district";
         public const int DefaultBatchSize = 100;
 
         /// <summary>省 / 市 / 区县 / 街道的 code 长度（pcas-code.json 的实际约定）。</summary>
@@ -20,27 +19,31 @@ namespace DistrictJsonToSql
 
         private const int MaxDepth = 4;
 
-        /// <summary>
-        /// 生成整份 SQL 脚本（含头部注释与分批 INSERT）。
-        /// 输入不合法时抛 <see cref="ArgumentException"/>，消息里带节点路径。
-        /// </summary>
+        /// <summary>使用 exe 同目录的默认配置生成 SQL。</summary>
         public static string GenerateSql(IEnumerable<DistrictItem> districts)
+        {
+            return GenerateSql(districts, CreateDialect(GeneratorOptions.LoadDefault()));
+        }
+
+        public static string GenerateSql(IEnumerable<DistrictItem> districts, ISqlDialect dialect)
         {
             if (districts == null)
             {
                 throw new ArgumentNullException(nameof(districts));
             }
 
-            var items = districts.ToList();
-            var seenCodes = new Dictionary<int, HashSet<string>>();
-            for (var level = 1; level <= MaxDepth; level++)
+            if (dialect == null)
             {
-                seenCodes[level] = new HashSet<string>(StringComparer.Ordinal);
+                throw new ArgumentNullException(nameof(dialect));
             }
 
-            for (var i = 0; i < items.Count; i++)
+            var items = districts.ToList();
+            Validate(items);
+
+            var tuples = new List<string>();
+            foreach (var item in items)
             {
-                ValidateNode(items[i], 1, "[" + i + "]", seenCodes);
+                Collect(item, 1, null, tuples, dialect);
             }
 
             var sqlBuilder = new StringBuilder();
@@ -48,49 +51,10 @@ namespace DistrictJsonToSql
             sqlBuilder.AppendLine("-- 生成时间: " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
             sqlBuilder.AppendLine();
 
-            var insertStatements = new List<string>();
-
-            foreach (var district in items)
+            for (var i = 0; i < tuples.Count; i += dialect.BatchSize)
             {
-                var provinceGuid = Guid.CreateVersion7().ToString();
-                var provinceSql = GenerateInsertStatement(provinceGuid, district.Code + "0000", district.Name, 1, null);
-                insertStatements.Add(provinceSql);
-
-                if (district.Children != null)
-                {
-                    foreach (var city in district.Children)
-                    {
-                        var cityGuid = Guid.CreateVersion7().ToString();
-                        var citySql = GenerateInsertStatement(cityGuid, city.Code + "00", city.Name, 2, district.Code + "0000");
-                        insertStatements.Add(citySql);
-
-                        if (city.Children != null)
-                        {
-                            foreach (var county in city.Children)
-                            {
-                                var countyGuid = Guid.CreateVersion7().ToString();
-                                var countySql = GenerateInsertStatement(countyGuid, county.Code, county.Name, 3, city.Code + "00");
-                                insertStatements.Add(countySql);
-
-                                if (county.Children != null)
-                                {
-                                    foreach (var street in county.Children)
-                                    {
-                                        var streetGuid = Guid.CreateVersion7().ToString();
-                                        var streetSql = GenerateInsertStatement(streetGuid, street.Code, street.Name, 4, county.Code);
-                                        insertStatements.Add(streetSql);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            for (int i = 0; i < insertStatements.Count; i += DefaultBatchSize)
-            {
-                var batch = insertStatements.Skip(i).Take(DefaultBatchSize);
-                sqlBuilder.AppendLine("INSERT INTO " + TableName + " (guid, code, \"name\", district_type, parent_code) VALUES");
+                var batch = tuples.Skip(i).Take(dialect.BatchSize);
+                sqlBuilder.AppendLine(dialect.BuildInsertHeader());
                 sqlBuilder.AppendLine(string.Join(",\n", batch) + ";");
                 sqlBuilder.AppendLine();
             }
@@ -98,13 +62,15 @@ namespace DistrictJsonToSql
             return sqlBuilder.ToString();
         }
 
-        /// <summary>
-        /// 生成单条 VALUES 元组，例如 (guid, '110000', '北京市', 1, NULL)。
-        /// </summary>
-        public static string GenerateInsertStatement(string guid, string code, string name, int districtType, string parentCode)
+        public static ISqlDialect CreateDialect(GeneratorOptions options)
         {
-            var parentValue = parentCode == null ? "NULL" : $"'{parentCode}'";
-            return $"('{guid}'::uuid, '{code}', '{name.Replace("'", "''")}', {districtType}, {parentValue})";
+            if (options == null)
+            {
+                throw new ArgumentNullException(nameof(options));
+            }
+
+            options.Validate();
+            return new PostgresDialect(options);
         }
 
         /// <summary>
@@ -115,37 +81,77 @@ namespace DistrictJsonToSql
             File.WriteAllText(sqlFilePath, sql, new UTF8Encoding(false));
         }
 
+        /// <summary>递归展开节点树，替代此前的四层嵌套循环。</summary>
+        private static void Collect(DistrictItem node, int depth, string parentCode, List<string> output, ISqlDialect dialect)
+        {
+            var code = EffectiveCode(node, depth);
+            output.Add(dialect.BuildValueTuple(Guid.CreateVersion7().ToString(), code, node.Name, depth, parentCode));
+
+            if (node.Children == null)
+            {
+                return;
+            }
+
+            foreach (var child in node.Children)
+            {
+                Collect(child, depth + 1, code, output, dialect);
+            }
+        }
+
+        private static string EffectiveCode(DistrictItem node, int depth)
+        {
+            if (depth == 1)
+            {
+                return node.Code + "0000";
+            }
+
+            return depth == 2 ? node.Code + "00" : node.Code;
+        }
+
+        private static void Validate(List<DistrictItem> items)
+        {
+            var seenCodes = new Dictionary<int, HashSet<string>>();
+            for (var level = 1; level <= MaxDepth; level++)
+            {
+                seenCodes[level] = new HashSet<string>(StringComparer.Ordinal);
+            }
+
+            for (var i = 0; i < items.Count; i++)
+            {
+                ValidateNode(items[i], 1, "[" + i + "]", seenCodes);
+            }
+        }
+
         private static void ValidateNode(DistrictItem node, int depth, string path, Dictionary<int, HashSet<string>> seenCodes)
         {
             if (depth > MaxDepth)
             {
-                throw new ArgumentException(
-                    "行政区划最多支持 " + MaxDepth + " 级，却发现第 " + depth + " 级节点：" + path);
+                throw new DistrictValidationException(
+                    "行政区划最多支持 " + MaxDepth + " 级，却发现第 " + depth + " 级节点：" + path, path);
             }
 
             if (node == null)
             {
-                throw new ArgumentException("第 " + depth + " 级存在空节点：" + path);
+                throw new DistrictValidationException("第 " + depth + " 级存在空节点：" + path, path);
             }
 
             if (string.IsNullOrWhiteSpace(node.Name))
             {
-                throw new ArgumentException(
-                    "第 " + depth + " 级节点缺少 name：" + path + " code=" + node.Code);
+                throw new DistrictValidationException("第 " + depth + " 级节点缺少 name：" + path + " code=" + node.Code, path);
             }
 
             if (node.Code == null || node.Code.Length != ExpectedCodeLengths[depth - 1] || !IsDigitsOnly(node.Code))
             {
-                throw new ArgumentException(
+                throw new DistrictValidationException(
                     "第 " + depth + " 级 code 应为 " + ExpectedCodeLengths[depth - 1] + " 位数字，实际为 "
                     + (node.Code == null ? "null" : node.Code.Length + " 位（" + node.Code + "）")
-                    + "：" + path + " name=" + node.Name);
+                    + "：" + path + " name=" + node.Name, path);
             }
 
             if (!seenCodes[depth].Add(node.Code))
             {
-                throw new ArgumentException(
-                    "第 " + depth + " 级 code 重复：" + path + " code=" + node.Code + " name=" + node.Name);
+                throw new DistrictValidationException(
+                    "第 " + depth + " 级 code 重复：" + path + " code=" + node.Code + " name=" + node.Name, path);
             }
 
             if (node.Children == null)
@@ -168,6 +174,7 @@ namespace DistrictJsonToSql
                     return false;
                 }
             }
+
             return true;
         }
     }

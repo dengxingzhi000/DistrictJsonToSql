@@ -64,9 +64,11 @@ namespace DistrictJsonToSql.Tests
         }
 
         [Fact]
-        public void GenerateInsertStatement_DoublesSingleQuotesInName()
+        public void PostgresDialect_DoublesSingleQuotesInName()
         {
-            var tuple = SqlGenerator.GenerateInsertStatement(
+            var dialect = new PostgresDialect(new GeneratorOptions());
+
+            var tuple = dialect.BuildValueTuple(
                 "00000000-0000-0000-0000-000000000000", "110000", "张'三", 1, null);
 
             Assert.Equal(

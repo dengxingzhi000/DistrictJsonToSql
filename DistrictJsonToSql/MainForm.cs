@@ -1,9 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Text;
 using System.Windows.Forms;
-using Newtonsoft.Json;
 
 namespace DistrictJsonToSql
 {
@@ -99,12 +96,12 @@ namespace DistrictJsonToSql
             try
             {
                 lblStatus.Text = "正在生成SQL...";
-                string jsonContent = File.ReadAllText(txtFilePath.Text, Encoding.UTF8);
-
-                var districts = JsonConvert.DeserializeObject<List<DistrictItem>>(jsonContent);
-                if (districts == null || districts.Count == 0)
+                var reader = new JsonDistrictReader();
+                var districts = reader.Read(txtFilePath.Text);
+                if (districts.Count == 0)
                 {
-                    MessageBox.Show("JSON文件格式错误或为空");
+                    MessageBox.Show("JSON文件里没有行政区划数据", "提示", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    lblStatus.Text = "JSON为空";
                     return;
                 }
 
@@ -117,10 +114,21 @@ namespace DistrictJsonToSql
                 lblStatus.Text = $"SQL生成完成，已保存到: {sqlFileName}";
                 MessageBox.Show($"SQL文件已生成：{sqlFileName}", "完成", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
+            catch (DistrictValidationException ex)
+            {
+                lblStatus.Text = "数据校验失败";
+                ErrorLogger.Log("validate " + ex.NodePath, ex);
+                MessageBox.Show(
+                    $"行政区划数据不合法（位置 {ex.NodePath}）：{ex.Message}\n\n详细信息见：{ErrorLogger.LogPath}",
+                    "数据校验失败", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
             catch (Exception ex)
             {
                 lblStatus.Text = "生成失败";
-                MessageBox.Show($"生成SQL时出错：{ex.Message}", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                ErrorLogger.Log("generate", ex);
+                MessageBox.Show(
+                    $"生成SQL时出错：{ex.Message}\n\n详细信息见：{ErrorLogger.LogPath}",
+                    "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
