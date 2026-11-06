@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Threading;
 using Xunit;
 
 namespace DistrictJsonToSql.Tests
@@ -27,17 +28,20 @@ namespace DistrictJsonToSql.Tests
             }
         }
 
+        /// <summary>
+        /// Guid.CreateVersion7() 只保证跨毫秒的时间顺序；同一毫秒内 rand_a 是随机值
+        /// （RFC 9562 允许），因此这里比较两次不同毫秒的生成结果。
+        /// </summary>
         [Fact]
-        public void GeneratedGuids_ShouldSortByGenerationOrder()
+        public void GeneratedGuids_ShouldSortByGenerationTimeAcrossMilliseconds()
         {
-            var guids = ExtractGeneratedGuids();
+            var first = ExtractGeneratedGuids()[0];
+            Thread.Sleep(20);
+            var second = ExtractGeneratedGuids()[0];
 
-            for (var i = 1; i < guids.Count; i++)
-            {
-                Assert.True(
-                    string.CompareOrdinal(guids[i - 1], guids[i]) < 0,
-                    guids[i - 1] + " 应排在 " + guids[i] + " 之前");
-            }
+            Assert.True(
+                string.CompareOrdinal(first, second) < 0,
+                first + " 应排在 " + second + " 之前");
         }
 
         [Fact]
