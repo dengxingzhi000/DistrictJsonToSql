@@ -47,10 +47,10 @@ jobs:
           }
 
           [xml]$trx = Get-Content $trxFile.FullName
-          $total = [int]$trx.TestRun.ResultSummary.Counter.total
           $results = @($trx.TestRun.Results.UnitTestResult)
+          $total = $results.Count
           $passed = @($results | Where-Object { $_.outcome -eq "Passed" }).Count
 
-          Write-Host "total=$total results=$($results.Count) passed=$passed"
+          Write-Host "total=$total passed=$passed"
           if ($total -lt 1) { throw "测试总数为 0，workflow 属于空跑" }
           if ($passed -lt 1) { throw "没有任何用例通过，workflow 属于空跑" }
