@@ -63,7 +63,7 @@ namespace DistrictJsonToSql.Tests
                 new DistrictItem { Code = "110000", Name = "北京市" }
             };
 
-            var error = Assert.Throws<ArgumentException>(() => SqlGenerator.GenerateSql(districts));
+            var error = Assert.Throws<DistrictValidationException>(() => SqlGenerator.GenerateSql(districts));
             Assert.Contains("[0]", error.Message);
             Assert.Contains("2 位", error.Message);
         }
@@ -77,7 +77,7 @@ namespace DistrictJsonToSql.Tests
                 new DistrictItem { Code = "11", Name = "重复的省" }
             };
 
-            var error = Assert.Throws<ArgumentException>(() => SqlGenerator.GenerateSql(districts));
+            var error = Assert.Throws<DistrictValidationException>(() => SqlGenerator.GenerateSql(districts));
             Assert.Contains("重复", error.Message);
         }
 
@@ -86,7 +86,7 @@ namespace DistrictJsonToSql.Tests
         {
             var district = NestedToDepth(5);
 
-            var error = Assert.Throws<ArgumentException>(() => SqlGenerator.GenerateSql(new List<DistrictItem> { district }));
+            var error = Assert.Throws<DistrictValidationException>(() => SqlGenerator.GenerateSql(new List<DistrictItem> { district }));
             Assert.Contains("第 5 级", error.Message);
         }
 
@@ -98,7 +98,7 @@ namespace DistrictJsonToSql.Tests
                 new DistrictItem { Code = "11", Name = " " }
             };
 
-            Assert.Throws<ArgumentException>(() => SqlGenerator.GenerateSql(districts));
+            Assert.Throws<DistrictValidationException>(() => SqlGenerator.GenerateSql(districts));
         }
 
         [Fact]
