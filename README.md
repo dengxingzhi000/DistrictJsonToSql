@@ -4,10 +4,10 @@
 
 ### 一键把四级行政区划 JSON 转换为 PostgreSQL 批量插入脚本。
 
-**.NET Framework 4.7.2 WinForms。仅依赖 Newtonsoft.Json，离线运行，
+**.NET 10 WinForms，自包含单文件发布，双击即用、离线运行。
 UUIDv7 主键时间有序，索引写入更友好。**
 
-[![.NET](https://img.shields.io/badge/.NET%20Framework-4.7.2-512BD4?logo=dotnet&logoColor=white&style=flat-square)](https://dotnet.microsoft.com/)
+[![.NET](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet&logoColor=white&style=flat-square)](https://dotnet.microsoft.com/)
 [![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)](#许可证)
 
 [使用方式](#使用方式) · [转换规则](#转换规则) · [项目结构](#项目结构)
@@ -17,11 +17,10 @@ UUIDv7 主键时间有序，索引写入更友好。**
 </div>
 
 > [!NOTE]
-> 目标框架是 **.NET Framework 4.7.2**（SDK-style 工程，`TargetFramework=net472`），
-> 不是 .NET 5+，产物仍是可在 Windows 上双击运行的 WinForms exe。
-> 工程已迁移到 SDK-style + `PackageReference`，可以直接 `dotnet build`；
-> CI 依赖 `Microsoft.NETFramework.ReferenceAssemblies.net472`，
-> 因此在没有 4.7.2 targeting pack 的机器上也能编译。
+> 目标框架是 **.NET 10**（`net10.0-windows`），WinForms 界面保持不变。
+> CI 以 `win-x64` 自包含单文件方式发布，产物仍是双击即用的 WinForms exe，
+> 目标机器不需要预装 .NET 桌面运行时。
+> 开发构建需要 .NET 10 SDK，`dotnet build` / `dotnet test` 即可。
 > JSON 解析依赖 Newtonsoft.Json 13.0.4。
 
 ---
@@ -32,7 +31,8 @@ SQL 的小工具。
 
 ## 使用方式
 
-1. 编译或直接运行 `DistrictJsonToSql.exe`
+1. 直接运行 `DistrictJsonToSql.exe`（自包含发布版无需安装 .NET 运行时）；
+   自行构建用 `dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true`
 2. 点击选择按钮，载入行政区划 JSON 文件（仓库自带示例 `pcas-code.json`）
 3. 复制生成的 SQL 到数据库客户端执行
 
@@ -85,13 +85,13 @@ VALUES
 
 - **批量 INSERT** —— 每 100 行合成一条 `INSERT ... VALUES`，不逐条插入
 - **名称转义** —— 名称中的单引号按 SQL 标准加倍（`'` → `''`）
-- **主键为 UUIDv7** —— 按 RFC 9562 生成，字符串顺序即时间顺序，索引局部性优于 UUIDv4
+- **主键为 UUIDv7** —— 按 RFC 9562 生成，跨毫秒的字符串顺序即时间顺序，索引局部性优于 UUIDv4
 - **PostgreSQL 方言** —— 主键带 `::uuid` 类型转换，`name` 用双引号包裹
 
 > [!NOTE]
-> UUIDv7 生成器是 `GuidV7Generator.cs` 里的手写实现，而不是
-> `Guid.CreateVersion7()` —— 后者是 .NET 9+ 的 API，在 4.7.2 上不可用。
-> 手写实现严格按 RFC 9562 组合时间戳、版本位与变体位，产出的字符串可直接按时间排序。
+> 主键由 `Guid.CreateVersion7()` 生成（.NET 9+ API），
+> 前 48 位是毫秒时间戳，跨毫秒的字符串顺序即时间顺序；
+> 同一毫秒内的 `rand_a` 是随机值（RFC 9562 允许），不保证严格递增。
 
 ## 项目结构
 
@@ -106,9 +106,8 @@ DistrictJsonToSql/
     ├── MainForm.cs                         # 界面（选择文件、展示结果）
     ├── SqlGenerator.cs                     # JSON → SQL 的纯转换逻辑与输入校验
     ├── DistrictItem.cs                     # 行政区划节点模型
-    ├── GuidV7Generator.cs                  # RFC 9562 UUIDv7 生成器
     ├── Program.cs                          # 入口点
-    ├── DistrictJsonToSql.csproj            # net472 WinExe（SDK-style）
+    ├── DistrictJsonToSql.csproj            # net10 WinExe（SDK-style）
     ├── App.config
     └── Properties/                         # Resources / Settings
 ```

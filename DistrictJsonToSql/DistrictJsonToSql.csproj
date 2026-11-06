@@ -2,20 +2,15 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net472</TargetFramework>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>disable</ImplicitUsings>
     <RootNamespace>DistrictJsonToSql</RootNamespace>
     <AssemblyName>DistrictJsonToSql</AssemblyName>
     <LangVersion>latest</LangVersion>
     <Version>1.2.1</Version>
     <Deterministic>true</Deterministic>
-    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
   </PropertyGroup>
-
-  <ItemGroup>
-    <Reference Include="System.Configuration" />
-    <Reference Include="System.Drawing" />
-    <Reference Include="System.Windows.Forms" />
-  </ItemGroup>
 
   <ItemGroup>
     <Compile Update="MainForm.cs">
@@ -25,8 +20,6 @@
 
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
-    <!-- 让 CI / 无 4.7.2 targeting pack 的机器也能编译 net472 -->
-    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net472" Version="1.0.3" PrivateAssets="all" />
   </ItemGroup>
 
 </Project>
