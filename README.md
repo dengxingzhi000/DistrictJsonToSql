@@ -20,6 +20,7 @@ UUIDv7 主键时间有序，索引写入更友好。**
 > 目标框架是 **.NET 10**（`net10.0-windows`），WinForms 界面保持不变。
 > CI 以 `win-x64` 自包含单文件方式发布，产物仍是双击即用的 WinForms exe，
 > 目标机器不需要预装 .NET 桌面运行时。
+> 每次 CI 运行产出的 artifact 名为 `DistrictJsonToSql-win-x64`，其中只有 `DistrictJsonToSql.exe` 这一个文件。
 > 开发构建需要 .NET 10 SDK，`dotnet build` / `dotnet test` 即可。
 > JSON 解析依赖 Newtonsoft.Json 13.0.4。
 
@@ -32,7 +33,10 @@ SQL 的小工具。
 ## 使用方式
 
 1. 直接运行 `DistrictJsonToSql.exe`（自包含发布版无需安装 .NET 运行时）；
-   自行构建用 `dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true`
+   从 CI 运行的 artifacts 里下载 `DistrictJsonToSql-win-x64`，解压即得到 `DistrictJsonToSql.exe`；
+   自行构建用
+   `dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o dist`，
+   产物同样是 `dist/DistrictJsonToSql.exe`
 2. 点击选择按钮，载入行政区划 JSON 文件（仓库自带示例 `pcas-code.json`）
 3. 复制生成的 SQL 到数据库客户端执行
 
