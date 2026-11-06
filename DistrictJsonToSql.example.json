@@ -1,0 +1,14 @@
+{
+  // 复制为 DistrictJsonToSql.json 放到 exe 同目录即可生效；
+  // 这里的值就是默认值，不配置时输出与历史版本完全一致。
+  "tableName": "public.tb_district",
+  "batchSize": 100,
+  "dialect": "postgres",
+  "columns": {
+    "guid": "guid",
+    "code": "code",
+    "name": "name",
+    "districtType": "district_type",
+    "parentCode": "parent_code"
+  }
+}

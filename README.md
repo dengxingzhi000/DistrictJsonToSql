@@ -93,18 +93,54 @@ VALUES
 > 前 48 位是毫秒时间戳，跨毫秒的字符串顺序即时间顺序；
 > 同一毫秒内的 `rand_a` 是随机值（RFC 9562 允许），不保证严格递增。
 
+## 扩展点与配置
+
+转换逻辑与界面、方言、输入格式已经拆开，但接口保持最小——没有第二方言或第二种输入格式的真实需求，
+就不预置插件注册机制。
+
+| 扩展点 | 文件 | 说明 |
+| ------ | ---- | ---- |
+| `ISqlDialect` | `DistrictJsonToSql/ISqlDialect.cs` | INSERT 头部、一行 VALUES、批量大小；目前只有 `PostgresDialect` |
+| `IDistrictReader` | `DistrictJsonToSql/IDistrictReader.cs` | 输入适配层；目前只有 `JsonDistrictReader`（pcas-code.json 风格） |
+| `GeneratorOptions` | `DistrictJsonToSql/GeneratorOptions.cs` | 表名、列名、批量大小、方言名，可外置为 JSON |
+| `DistrictValidationException` | `DistrictJsonToSql/DistrictValidationException.cs` | 校验失败时携带节点路径（如 `[0].children[1]`） |
+
+### 外置配置
+
+把 `DistrictJsonToSql.example.json` 复制成 `DistrictJsonToSql.json`，放在 exe 同目录即可覆盖默认值：
+
+```json
+{
+  "tableName": "public.tb_district",
+  "batchSize": 100,
+  "dialect": "postgres",
+  "columns": { "name": "name" }
+}
+```
+
+- 只写需要修改的项即可，未写的项沿用默认值（默认值与历史输出逐字节一致）
+- 键名大小写不敏感，允许注释与末尾逗号
+- `dialect` 目前只接受 `postgres`
+- 校验失败不会中断界面，错误详情写入 `%LOCALAPPDATA%\DistrictJsonToSql\error.log`
+
 ## 项目结构
 
 ```text
 DistrictJsonToSql/
 ├── DistrictJsonToSql.sln
 ├── pcas-code.json                          # 示例行政区划数据
+├── DistrictJsonToSql.example.json          # 外置配置示例
 ├── LICENSE                                 # MIT
 ├── .github/workflows/ci.yml                # windows-latest 上构建 + 跑测试
-├── tests/DistrictJsonToSql.Tests/          # xunit golden / 回归用例
+├── tests/DistrictJsonToSql.Tests/          # xunit golden / 回归 / 扩展点用例
 └── DistrictJsonToSql/
     ├── MainForm.cs                         # 界面（选择文件、展示结果）
-    ├── SqlGenerator.cs                     # JSON → SQL 的纯转换逻辑与输入校验
+    ├── SqlGenerator.cs                     # 递归展开 + 输入校验 + 分批输出
+    ├── ISqlDialect.cs / PostgresDialect.cs # 方言扩展点
+    ├── IDistrictReader.cs / JsonDistrictReader.cs  # 输入适配
+    ├── GeneratorOptions.cs                 # 表名 / 列序 / 批量大小配置
+    ├── DistrictValidationException.cs      # 带节点路径的校验错误
+    ├── ErrorLogger.cs                      # 错误详情落盘
     ├── DistrictItem.cs                     # 行政区划节点模型
     ├── Program.cs                          # 入口点
     ├── DistrictJsonToSql.csproj            # net10 WinExe（SDK-style）
