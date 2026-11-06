@@ -51,13 +51,13 @@ namespace DistrictJsonToSql.Tests
         [Fact]
         public void GenerateSql_MoreThanOneBatch_SplitsInsertStatements()
         {
-            var districts = new List<DistrictItem>();
-            for (var i = 0; i < SqlGenerator.DefaultBatchSize + 1; i++)
+            var province = new DistrictItem { Code = "11", Name = "省", Children = new List<DistrictItem>() };
+            for (var i = 0; i < SqlGenerator.DefaultBatchSize; i++)
             {
-                districts.Add(new DistrictItem { Code = "11", Name = "省" + i });
+                province.Children.Add(new DistrictItem { Code = i.ToString("D4"), Name = "市" + i });
             }
 
-            var sql = SqlGenerator.GenerateSql(districts);
+            var sql = SqlGenerator.GenerateSql(new List<DistrictItem> { province });
 
             var headers = Regex.Matches(sql, "INSERT INTO public\\.tb_district").Count;
             Assert.Equal(2, headers);

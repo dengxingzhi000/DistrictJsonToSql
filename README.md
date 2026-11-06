@@ -4,7 +4,7 @@
 
 ### 一键把四级行政区划 JSON 转换为 PostgreSQL 批量插入脚本。
 
-**.NET Framework 4.7.2 WinForms。零依赖、离线运行，
+**.NET Framework 4.7.2 WinForms。仅依赖 Newtonsoft.Json，离线运行，
 UUIDv7 主键时间有序，索引写入更友好。**
 
 [![.NET](https://img.shields.io/badge/.NET%20Framework-4.7.2-512BD4?logo=dotnet&logoColor=white&style=flat-square)](https://dotnet.microsoft.com/)
@@ -17,10 +17,12 @@ UUIDv7 主键时间有序，索引写入更友好。**
 </div>
 
 > [!NOTE]
-> 目标框架是 **.NET Framework 4.7.2**（`TargetFrameworkVersion v4.7.2`），
-> 不是 .NET 5+。因此它无法用 `dotnet build` 构建 —— 需要 Visual Studio 或
-> Windows 上的 MSBuild 来编译 `DistrictJsonToSql.sln`。
-> JSON 解析依赖 Newtonsoft.Json 13.0.0.0，通过传统 `packages.config` 还原。
+> 目标框架是 **.NET Framework 4.7.2**（SDK-style 工程，`TargetFramework=net472`），
+> 不是 .NET 5+，产物仍是可在 Windows 上双击运行的 WinForms exe。
+> 工程已迁移到 SDK-style + `PackageReference`，可以直接 `dotnet build`；
+> CI 依赖 `Microsoft.NETFramework.ReferenceAssemblies.net472`，
+> 因此在没有 4.7.2 targeting pack 的机器上也能编译。
+> JSON 解析依赖 Newtonsoft.Json 13.0.4。
 
 ---
 
@@ -81,15 +83,15 @@ VALUES
 
 其余规则：
 
-- **单条批量 INSERT** —— 所有层级合并进一条 `INSERT ... VALUES`，不逐条插入
+- **批量 INSERT** —— 每 100 行合成一条 `INSERT ... VALUES`，不逐条插入
 - **名称转义** —— 名称中的单引号按 SQL 标准加倍（`'` → `''`）
-- **主键为 UUIDv7** —— 时间有序，相比 UUIDv4 索引局部性更好、写入更快
-  （约 30% 提升）
+- **主键为 UUIDv7** —— 按 RFC 9562 生成，字符串顺序即时间顺序，索引局部性优于 UUIDv4
 - **PostgreSQL 方言** —— 主键带 `::uuid` 类型转换，`name` 用双引号包裹
 
 > [!NOTE]
-> UUIDv7 生成器是 `MainForm.cs` 里的手写内部类 `GuidV7Generator`，而不是
+> UUIDv7 生成器是 `GuidV7Generator.cs` 里的手写实现，而不是
 > `Guid.CreateVersion7()` —— 后者是 .NET 9+ 的 API，在 4.7.2 上不可用。
+> 手写实现严格按 RFC 9562 组合时间戳、版本位与变体位，产出的字符串可直接按时间排序。
 
 ## 项目结构
 
@@ -97,19 +99,20 @@ VALUES
 DistrictJsonToSql/
 ├── DistrictJsonToSql.sln
 ├── pcas-code.json                          # 示例行政区划数据
+├── LICENSE                                 # MIT
+├── .github/workflows/ci.yml                # windows-latest 上构建 + 跑测试
+├── tests/DistrictJsonToSql.Tests/          # xunit golden / 回归用例
 └── DistrictJsonToSql/
-    ├── MainForm.cs                         # 界面与全部转换逻辑
+    ├── MainForm.cs                         # 界面（选择文件、展示结果）
+    ├── SqlGenerator.cs                     # JSON → SQL 的纯转换逻辑与输入校验
+    ├── DistrictItem.cs                     # 行政区划节点模型
+    ├── GuidV7Generator.cs                  # RFC 9562 UUIDv7 生成器
     ├── Program.cs                          # 入口点
-    ├── DistrictJsonToSql.csproj            # v4.7.2 WinExe，Newtonsoft.Json 13.0.0.0
+    ├── DistrictJsonToSql.csproj            # net472 WinExe（SDK-style）
     ├── App.config
-    ├── packages.config                     # 传统 NuGet 还原配置
-    └── Properties/                         # AssemblyInfo / Resources / Settings
+    └── Properties/                         # Resources / Settings
 ```
 
 ## 许可证
 
-MIT。
-
-> [!NOTE]
-> 仓库中**缺少 `LICENSE` 文件** —— 上述文字记录的是预期许可证，
-> 正式发布前需补上文件本体。
+MIT，见 [LICENSE](LICENSE)。

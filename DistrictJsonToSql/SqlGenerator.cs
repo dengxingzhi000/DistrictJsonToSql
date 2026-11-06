@@ -15,13 +15,36 @@ namespace DistrictJsonToSql
         public const string TableName = "public.tb_district";
         public const int DefaultBatchSize = 100;
 
+        /// <summary>省 / 市 / 区县 / 街道的 code 长度（pcas-code.json 的实际约定）。</summary>
+        private static readonly int[] ExpectedCodeLengths = { 2, 4, 6, 9 };
+
+        private const int MaxDepth = 4;
+
         private static readonly GuidV7Generator GuidGenerator = new GuidV7Generator();
 
         /// <summary>
         /// 生成整份 SQL 脚本（含头部注释与分批 INSERT）。
+        /// 输入不合法时抛 <see cref="ArgumentException"/>，消息里带节点路径。
         /// </summary>
         public static string GenerateSql(IEnumerable<DistrictItem> districts)
         {
+            if (districts == null)
+            {
+                throw new ArgumentNullException(nameof(districts));
+            }
+
+            var items = districts.ToList();
+            var seenCodes = new Dictionary<int, HashSet<string>>();
+            for (var level = 1; level <= MaxDepth; level++)
+            {
+                seenCodes[level] = new HashSet<string>(StringComparer.Ordinal);
+            }
+
+            for (var i = 0; i < items.Count; i++)
+            {
+                ValidateNode(items[i], 1, "[" + i + "]", seenCodes);
+            }
+
             var sqlBuilder = new StringBuilder();
             sqlBuilder.AppendLine("-- 地域数据插入SQL");
             sqlBuilder.AppendLine("-- 生成时间: " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
@@ -29,7 +52,7 @@ namespace DistrictJsonToSql
 
             var insertStatements = new List<string>();
 
-            foreach (var district in districts)
+            foreach (var district in items)
             {
                 var provinceGuid = GuidGenerator.Generate();
                 var provinceSql = GenerateInsertStatement(provinceGuid, district.Code + "0000", district.Name, 1, null);
@@ -87,11 +110,67 @@ namespace DistrictJsonToSql
         }
 
         /// <summary>
-        /// 把 SQL 脚本写入磁盘，覆盖同名 .sql 文件。
+        /// 把 SQL 脚本写入磁盘，覆盖同名 .sql 文件；不带 UTF-8 BOM，避免 psql 首行解析失败。
         /// </summary>
         public static void WriteSqlFile(string sqlFilePath, string sql)
         {
-            File.WriteAllText(sqlFilePath, sql, Encoding.UTF8);
+            File.WriteAllText(sqlFilePath, sql, new UTF8Encoding(false));
+        }
+
+        private static void ValidateNode(DistrictItem node, int depth, string path, Dictionary<int, HashSet<string>> seenCodes)
+        {
+            if (depth > MaxDepth)
+            {
+                throw new ArgumentException(
+                    "行政区划最多支持 " + MaxDepth + " 级，却发现第 " + depth + " 级节点：" + path);
+            }
+
+            if (node == null)
+            {
+                throw new ArgumentException("第 " + depth + " 级存在空节点：" + path);
+            }
+
+            if (string.IsNullOrWhiteSpace(node.Name))
+            {
+                throw new ArgumentException(
+                    "第 " + depth + " 级节点缺少 name：" + path + " code=" + node.Code);
+            }
+
+            if (node.Code == null || node.Code.Length != ExpectedCodeLengths[depth - 1] || !IsDigitsOnly(node.Code))
+            {
+                throw new ArgumentException(
+                    "第 " + depth + " 级 code 应为 " + ExpectedCodeLengths[depth - 1] + " 位数字，实际为 "
+                    + (node.Code == null ? "null" : node.Code.Length + " 位（" + node.Code + "）")
+                    + "：" + path + " name=" + node.Name);
+            }
+
+            if (!seenCodes[depth].Add(node.Code))
+            {
+                throw new ArgumentException(
+                    "第 " + depth + " 级 code 重复：" + path + " code=" + node.Code + " name=" + node.Name);
+            }
+
+            if (node.Children == null)
+            {
+                return;
+            }
+
+            for (var i = 0; i < node.Children.Count; i++)
+            {
+                ValidateNode(node.Children[i], depth + 1, path + ".children[" + i + "]", seenCodes);
+            }
+        }
+
+        private static bool IsDigitsOnly(string value)
+        {
+            for (var i = 0; i < value.Length; i++)
+            {
+                if (value[i] < '0' || value[i] > '9')
+                {
+                    return false;
+                }
+            }
+            return true;
         }
     }
 }

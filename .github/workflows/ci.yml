@@ -32,7 +32,12 @@ jobs:
           dotnet-version: "8.0.x"
 
       - name: Restore
-        run: dotnet restore tests/DistrictJsonToSql.Tests/DistrictJsonToSql.Tests.csproj
+        run: |
+          dotnet restore DistrictJsonToSql/DistrictJsonToSql.csproj
+          dotnet restore tests/DistrictJsonToSql.Tests/DistrictJsonToSql.Tests.csproj
+
+      - name: Build app (net472 WinExe)
+        run: dotnet build DistrictJsonToSql/DistrictJsonToSql.csproj -c Release --no-restore
 
       - name: Test
         run: dotnet test tests/DistrictJsonToSql.Tests/DistrictJsonToSql.Tests.csproj --no-restore --logger "trx;LogFileName=test-results.trx" --results-directory TestResults
