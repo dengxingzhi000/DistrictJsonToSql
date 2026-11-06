@@ -52,6 +52,9 @@
     <Compile Include="MainForm.cs">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Include="DistrictItem.cs" />
+    <Compile Include="GuidV7Generator.cs" />
+    <Compile Include="SqlGenerator.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <EmbeddedResource Include="Properties\Resources.resx">

@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+      - "p0/**"
+      - "p1/**"
+      - "p2/**"
+      - "p3/**"
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: build-and-test
+    runs-on: windows-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Restore
+        run: dotnet restore tests/DistrictJsonToSql.Tests/DistrictJsonToSql.Tests.csproj
+
+      - name: Test
+        run: dotnet test tests/DistrictJsonToSql.Tests/DistrictJsonToSql.Tests.csproj --no-restore --logger "trx;LogFileName=test-results.trx" --results-directory TestResults
+
+      # 防止 workflow 变成“空跑”：必须确认 TRX 里真的有用例被执行且至少一个通过。
+      - name: Prove tests actually executed
+        shell: pwsh
+        run: |
+          $trxFile = Get-ChildItem -Path TestResults -Recurse -Filter *.trx | Select-Object -First 1
+          if (-not $trxFile) {
+            throw "没有生成 TRX 结果文件，测试没有真正执行"
+          }
+
+          [xml]$trx = Get-Content $trxFile.FullName
+          $total = [int]$trx.TestRun.ResultSummary.Counter.total
+          $results = @($trx.TestRun.Results.UnitTestResult)
+          $passed = @($results | Where-Object { $_.outcome -eq "Passed" }).Count
+
+          Write-Host "total=$total results=$($results.Count) passed=$passed"
+          if ($total -lt 1) { throw "测试总数为 0，workflow 属于空跑" }
+          if ($passed -lt 1) { throw "没有任何用例通过，workflow 属于空跑" }
