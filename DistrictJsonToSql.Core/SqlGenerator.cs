@@ -122,7 +122,7 @@ namespace DistrictJsonToSql
                 }
 
                 // 标题行、空行：一个物理行
-                void WriteSimpleLine(string text)
+                void WriteSimpleLine(string text = "")
                 {
                     writer.WriteLine(text);
                     totalLines++;
