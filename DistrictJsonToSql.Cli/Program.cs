@@ -22,7 +22,8 @@ namespace DistrictJsonToSql.Cli
             "把行政区划 JSON（pcas-code.json 风格）转换成 PostgreSQL INSERT 脚本。\n" +
             "\n" +
             "用法：\n" +
-            "  DistrictJsonToSql.Cli --input <json> --output <sql> [--table <name>] [--batch <n>] [--all-errors]\n" +
+            "  DistrictJsonToSql.Cli --input <json> --output <sql> [--table <name>] [--batch <n>]\n" +
+            "                           [--all-errors] [--transaction] [--on-conflict <mode>]\n" +
             "\n" +
             "参数：\n" +
             "  -i, --input    输入 JSON 文件（必填）\n" +
@@ -30,6 +31,8 @@ namespace DistrictJsonToSql.Cli
             "  -t, --table    目标表名，默认 public.tb_district\n" +
             "  -b, --batch    每条 INSERT 的批量行数，默认 100（必须大于 0）\n" +
             "      --all-errors  校验失败时汇总输出全部问题（默认只报第一条）\n" +
+            "      --transaction 用 BEGIN / COMMIT 包裹脚本\n" +
+            "      --on-conflict <mode>  冲突处理：none（默认）/ doNothing / doUpdate\n" +
             "  -h, --help     显示本帮助\n" +
             "\n" +
             "退出码：\n" +
@@ -72,6 +75,8 @@ namespace DistrictJsonToSql.Cli
             }
 
             options.CollectAllErrors = arguments.AllErrors;
+            options.WrapInTransaction = arguments.Transaction;
+            options.OnConflict = arguments.OnConflict;
 
             IReadOnlyList<DistrictItem> districts;
             try
@@ -95,7 +100,8 @@ namespace DistrictJsonToSql.Cli
                 var dialect = SqlGenerator.CreateDialect(options);
                 // CLI 只需要写全量文件，不保留预览（previewLineLimit = 0）
                 result = SqlGenerator.GenerateSqlToFile(
-                    districts, arguments.OutputPath, dialect, 0, null, options.CollectAllErrors);
+                    districts, arguments.OutputPath, dialect, 0, null,
+                    options.CollectAllErrors, options.WrapInTransaction);
             }
             catch (DistrictValidationException ex)
             {

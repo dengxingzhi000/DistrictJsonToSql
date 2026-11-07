@@ -31,6 +31,8 @@ namespace DistrictJsonToSql
             TableName = defaults.TableName;
             BatchSizeText = defaults.BatchSize.ToString(CultureInfo.InvariantCulture);
             CollectAllErrors = defaults.CollectAllErrors;
+            WrapInTransaction = defaults.WrapInTransaction;
+            OnConflictText = OnConflictModes.ToText(OnConflictModes.Parse(defaults.OnConflict));
         }
 
         [ObservableProperty]
@@ -49,6 +51,14 @@ namespace DistrictJsonToSql
         /// <summary>高级选项：一次性汇总全部校验错误；默认 false（首错即抛）。</summary>
         [ObservableProperty]
         private bool _collectAllErrors;
+
+        /// <summary>高级选项：用 BEGIN / COMMIT 包裹整份脚本；默认 false。</summary>
+        [ObservableProperty]
+        private bool _wrapInTransaction;
+
+        /// <summary>高级选项：冲突处理策略（none / doNothing / doUpdate），直接绑定下拉框选中值。</summary>
+        [ObservableProperty]
+        private string _onConflictText = OnConflictModes.NoneText;
 
         [ObservableProperty]
         private string _sqlText = string.Empty;
@@ -180,7 +190,8 @@ namespace DistrictJsonToSql
 
                 var sqlFileName = Path.ChangeExtension(path, ".sql");
                 var result = await Task.Run(() => SqlGenerator.GenerateSqlToFile(
-                    districts, sqlFileName, dialect, PreviewLineLimit, progress, options.CollectAllErrors));
+                    districts, sqlFileName, dialect, PreviewLineLimit, progress,
+                    options.CollectAllErrors, options.WrapInTransaction));
 
                 SqlText = result.PreviewText;
                 HasOutput = true;
@@ -242,6 +253,9 @@ namespace DistrictJsonToSql
             options.TableName = tableName;
             options.BatchSize = batchSize;
             options.CollectAllErrors = CollectAllErrors;
+            options.WrapInTransaction = WrapInTransaction;
+            OnConflictModes.TryParse(OnConflictText, out var conflict);
+            options.OnConflict = OnConflictModes.ToText(conflict);
             return options;
         }
 

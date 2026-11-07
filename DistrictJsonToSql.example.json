@@ -4,6 +4,11 @@
   "tableName": "public.tb_district",
   "batchSize": 100,
   "dialect": "postgres",
+  // 输出选项：默认都不改变历史输出；onConflict 取值 none / doNothing / doUpdate
+  "wrapInTransaction": false,
+  "onConflict": "none",
+  // 校验失败时是否汇总全部问题（默认只报第一条）
+  "collectAllErrors": false,
   "columns": {
     "guid": "guid",
     "code": "code",

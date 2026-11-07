@@ -27,6 +27,13 @@ namespace DistrictJsonToSql
 
         /// <summary>为真时一次性汇总全部校验错误；默认 false，保持首错即抛。</summary>
         public bool CollectAllErrors { get; set; } = false;
+
+        /// <summary>是否用 BEGIN / COMMIT 包裹整份脚本；默认 false（输出与历史版本逐字节一致）。</summary>
+        public bool WrapInTransaction { get; set; } = false;
+
+        /// <summary>冲突处理策略：none / doNothing / doUpdate；默认 none。</summary>
+        public string OnConflict { get; set; } = OnConflictModes.NoneText;
+
         public ColumnNames Columns { get; set; } = new ColumnNames();
 
         public static GeneratorOptions LoadDefault()
@@ -77,6 +84,12 @@ namespace DistrictJsonToSql
             if (!string.Equals(Dialect, "postgres", StringComparison.OrdinalIgnoreCase))
             {
                 throw new ArgumentException("暂不支持方言：" + Dialect + "（当前仅支持 postgres）");
+            }
+
+            if (!OnConflictModes.TryParse(OnConflict, out _))
+            {
+                throw new ArgumentException(
+                    "配置项 onConflict 只能是 none / doNothing / doUpdate，当前为 " + (OnConflict ?? "null"));
             }
 
             if (string.IsNullOrWhiteSpace(Columns.Guid) || string.IsNullOrWhiteSpace(Columns.Code)
