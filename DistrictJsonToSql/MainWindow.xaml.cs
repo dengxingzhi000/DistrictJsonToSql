@@ -19,7 +19,8 @@ namespace DistrictJsonToSql
         {
             ViewModel = viewModel;
             InitializeComponent();
-            DataContext = viewModel;
+            // Window 不是 FrameworkElement，没有 DataContext；绑定挂在根 Grid 上
+            RootGrid.DataContext = viewModel;
 
             ExtendsContentIntoTitleBar = true;
             SetTitleBar(AppTitleBar);
