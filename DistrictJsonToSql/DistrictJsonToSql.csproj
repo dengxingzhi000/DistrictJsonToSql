@@ -9,7 +9,7 @@
     <UseWinUI>true</UseWinUI>
     <LangVersion>latest</LangVersion>
     <Deterministic>true</Deterministic>
-    <Version>2.0.0</Version>
+    <Version>2.1.0</Version>
 
     <!-- unpackaged + self-contained + 单文件（Windows App SDK 官方要求的属性组合） -->
     <WindowsPackageType>None</WindowsPackageType>
