@@ -295,6 +295,38 @@ namespace DistrictJsonToSql.Tests
         }
 
         [Fact]
+        public async Task Generate_OutputOptions_WritesTransactionAndConflict()
+        {
+            var directory = CreateTempDirectory();
+            try
+            {
+                var jsonPath = WriteJson(directory, "[{\"code\":\"11\",\"name\":\"北京市\"}]");
+                var viewModel = CreateViewModel(out var picker, out var dialogs);
+                picker.PathToReturn = jsonPath;
+                viewModel.WrapInTransaction = true;
+                viewModel.OnConflictText = "doUpdate";
+                await viewModel.SelectFileCommand.ExecuteAsync(null);
+
+                await viewModel.GenerateSqlCommand.ExecuteAsync(null);
+
+                Assert.True(viewModel.HasOutput);
+                Assert.False(viewModel.IsBusy);
+                Assert.Empty(dialogs.Errors);
+
+                var sqlPath = Path.ChangeExtension(jsonPath, ".sql");
+                var lines = NormalizeLineEndings(File.ReadAllText(sqlPath)).Split(Environment.NewLine);
+                Assert.Equal("BEGIN;", lines[3]);
+                Assert.Equal("COMMIT;", lines[lines.Length - 2]);
+                Assert.Contains("ON CONFLICT (code) DO UPDATE", lines[5]);
+                Assert.Contains("EXCLUDED.\"name\"", lines[5]);
+            }
+            finally
+            {
+                Directory.Delete(directory, true);
+            }
+        }
+
+        [Fact]
         public async Task Generate_CollectAllErrors_ShowsAggregatedDialog()
         {
             var directory = CreateTempDirectory();

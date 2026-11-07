@@ -25,7 +25,7 @@ namespace DistrictJsonToSql
             return GenerateSql(districts, CreateDialect(GeneratorOptions.LoadDefault()));
         }
 
-        public static string GenerateSql(IEnumerable<DistrictItem> districts, ISqlDialect dialect)
+        public static string GenerateSql(IEnumerable<DistrictItem> districts, ISqlDialect dialect, bool wrapInTransaction = false)
         {
             if (districts == null)
             {
@@ -51,6 +51,12 @@ namespace DistrictJsonToSql
             sqlBuilder.AppendLine("-- 生成时间: " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
             sqlBuilder.AppendLine();
 
+            if (wrapInTransaction)
+            {
+                sqlBuilder.AppendLine("BEGIN;");
+                sqlBuilder.AppendLine();
+            }
+
             for (var i = 0; i < tuples.Count; i += dialect.BatchSize)
             {
                 var batch = tuples.Skip(i).Take(dialect.BatchSize);
@@ -59,21 +65,29 @@ namespace DistrictJsonToSql
                 sqlBuilder.AppendLine();
             }
 
+            if (wrapInTransaction)
+            {
+                sqlBuilder.AppendLine("COMMIT;");
+            }
+
             return sqlBuilder.ToString();
         }
 
         /// <summary>
         /// 边生成边按批写入文件，不在内存里保留整份 SQL 文本；返回节点数、实际行数与前若干行预览。
-        /// 输出与 <see cref="GenerateSql(IEnumerable{DistrictItem}, ISqlDialect)"/> 逐字节一致（行尾、批次分隔、末尾空行都相同）。
+        /// 输出与 <see cref="GenerateSql(IEnumerable{DistrictItem}, ISqlDialect, bool)"/> 逐字节一致（行尾、批次分隔、末尾空行都相同）。
         /// </summary>
         /// <param name="previewLineLimit">预览保留的最大行数；0 表示不保留预览。写盘始终是全量。</param>
+        /// <param name="collectAllErrors">为真时一次性汇总全部校验错误；默认 false 保持首错即抛。</param>
+        /// <param name="wrapInTransaction">为真时在头部之后加 BEGIN;、在末尾加 COMMIT;；默认 false 输出不变。</param>
         public static SqlGenerationResult GenerateSqlToFile(
             IEnumerable<DistrictItem> districts,
             string sqlFilePath,
             ISqlDialect dialect,
             int previewLineLimit,
             IProgress<SqlGenerationProgress> progress,
-            bool collectAllErrors = false)
+            bool collectAllErrors = false,
+            bool wrapInTransaction = false)
         {
             if (districts == null)
             {
@@ -167,6 +181,12 @@ namespace DistrictJsonToSql
                 WriteSimpleLine("-- 生成时间: " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
                 WriteSimpleLine();
 
+                if (wrapInTransaction)
+                {
+                    WriteSimpleLine("BEGIN;");
+                    WriteSimpleLine();
+                }
+
                 foreach (var item in items)
                 {
                     foreach (var tuple in Collect(item, 1, null, dialect))
@@ -183,6 +203,12 @@ namespace DistrictJsonToSql
                 }
 
                 FlushBatch();
+
+                if (wrapInTransaction)
+                {
+                    WriteSimpleLine("COMMIT;");
+                }
+
                 progress?.Report(new SqlGenerationProgress(nodesDone, nodesTotal));
             }
 

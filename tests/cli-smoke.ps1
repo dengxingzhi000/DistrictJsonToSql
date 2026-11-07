@@ -116,6 +116,34 @@ try {
         throw "[写盘失败] stderr 未提示写入失败：$($writeFailure.StdErr)"
     }
 
+    # 7b. 输出选项：--transaction + --on-conflict doUpdate，默认输出不受影响
+    $optSql = Join-Path $workDir "options.sql"
+    $opts = Invoke-Cli @("--input", $Sample, "--output", $optSql, "--transaction", "--on-conflict", "doUpdate")
+    Assert-ExitCode $opts 0 "输出选项"
+    $optText = (Get-Content $optSql -Raw -Encoding utf8).Replace("`r`n", "`n")
+    if ($optText -notmatch "`nBEGIN;`n") {
+        throw "[输出选项] 缺少 BEGIN;"
+    }
+    if ($optText -notmatch "`nCOMMIT;`n") {
+        throw "[输出选项] 缺少 COMMIT;"
+    }
+    if ($optText -notmatch 'VALUES ON CONFLICT \(code\) DO UPDATE SET "name" = EXCLUDED\."name"') {
+        throw "[输出选项] 缺少 ON CONFLICT DO UPDATE 子句：$optText"
+    }
+    # 12 行基线 + BEGIN;/空行/COMMIT; = 15 行
+    $optLineCount = ([regex]::Matches($optText, "`n")).Count
+    if ($optLineCount -ne 15) {
+        throw "[输出选项] 行数应为 15，实际 $optLineCount"
+    }
+
+    $plainText = Get-Content $sqlPath -Raw -Encoding utf8
+    if ($plainText -match "BEGIN;|ON CONFLICT") {
+        throw "[输出选项] 默认输出不应包含事务或冲突子句"
+    }
+
+    $badConflict = Invoke-Cli @("--input", $Sample, "--output", $sqlPath, "--on-conflict", "merge")
+    Assert-ExitCode $badConflict 2 "非法 --on-conflict"
+
     # 7. --help → 0
     $help = Invoke-Cli @("--help")
     Assert-ExitCode $help 0 "--help"

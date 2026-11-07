@@ -19,6 +19,12 @@ namespace DistrictJsonToSql.Cli
         /// <summary>为真时一次性汇总全部校验错误（默认仍首错即抛）。</summary>
         public bool AllErrors { get; private set; }
 
+        /// <summary>为真时用 BEGIN / COMMIT 包裹脚本。</summary>
+        public bool Transaction { get; private set; }
+
+        /// <summary>冲突处理策略，取值 none / doNothing / doUpdate。</summary>
+        public string OnConflict { get; private set; } = OnConflictModes.NoneText;
+
         public static CliArguments Parse(string[] args)
         {
             var result = new CliArguments();
@@ -66,6 +72,20 @@ namespace DistrictJsonToSql.Cli
 
                     case "--all-errors":
                         result.AllErrors = true;
+                        break;
+
+                    case "--transaction":
+                        result.Transaction = true;
+                        break;
+
+                    case "--on-conflict":
+                        var rawConflict = TakeValue(args, ref i, arg);
+                        if (!OnConflictModes.TryParse(rawConflict, out var conflict))
+                        {
+                            throw new UsageException("--on-conflict 只能是 none / doNothing / doUpdate，实际为：" + rawConflict);
+                        }
+
+                        result.OnConflict = OnConflictModes.ToText(conflict);
                         break;
 
                     default:

@@ -89,7 +89,7 @@
                 <Expander.Header>
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <FontIcon Glyph="&#xE713;" FontSize="16" />
-                        <TextBlock Text="高级选项：表名、批量与校验" VerticalAlignment="Center" />
+                        <TextBlock Text="高级选项：表名、批量与输出" VerticalAlignment="Center" />
                     </StackPanel>
                 </Expander.Header>
 
@@ -99,6 +99,7 @@
                         <ColumnDefinition Width="180" />
                     </Grid.ColumnDefinitions>
                     <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
@@ -117,6 +118,21 @@
                               Content="汇总所有校验错误（默认只报第一条）"
                               IsChecked="{Binding CollectAllErrors, Mode=TwoWay}"
                               AutomationProperties.Name="汇总所有校验错误" />
+
+                    <CheckBox Grid.Row="2" Grid.Column="0" Margin="0,12,0,0"
+                              Content="用事务包裹（BEGIN / COMMIT）"
+                              IsChecked="{Binding WrapInTransaction, Mode=TwoWay}"
+                              AutomationProperties.Name="用事务包裹" />
+
+                    <ComboBox Grid.Row="2" Grid.Column="1" Margin="0,12,0,0"
+                              Header="冲突处理"
+                              SelectedValuePath="Tag"
+                              SelectedValue="{Binding OnConflictText, Mode=TwoWay}"
+                              AutomationProperties.Name="冲突处理">
+                        <ComboBoxItem Content="不追加" Tag="none" />
+                        <ComboBoxItem Content="DO NOTHING" Tag="doNothing" />
+                        <ComboBoxItem Content="DO UPDATE" Tag="doUpdate" />
+                    </ComboBox>
                 </Grid>
             </Expander>
         </Border>

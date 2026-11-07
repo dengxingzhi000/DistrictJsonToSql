@@ -55,7 +55,7 @@ SQL 的小工具。
 dotnet run --project DistrictJsonToSql.Cli -- --input pcas-code.json --output district.sql --table public.tb_district --batch 100
 ```
 
-参数：`--input`（必填）、`--output`（必填，UTF-8 无 BOM）、`--table`（默认 `public.tb_district`）、`--batch`（默认 100）、`--all-errors`（校验失败时汇总输出全部问题，默认只报第一条）、`--help`。
+参数：`--input`（必填）、`--output`（必填，UTF-8 无 BOM）、`--table`（默认 `public.tb_district`）、`--batch`（默认 100）、`--all-errors`（校验失败时汇总输出全部问题，默认只报第一条）、`--transaction`（用 `BEGIN` / `COMMIT` 包裹脚本）、`--on-conflict <none|doNothing|doUpdate>`（冲突处理，默认 `none`）、`--help`。
 退出码：`0` 成功、`1` 未预期错误、`2` 参数错误、`3` 输入读取失败、`4` 数据校验失败、`5` 输出写入失败；错误信息一律走 stderr，stdout 只放正常输出。
 
 ### 输入 JSON
@@ -109,6 +109,9 @@ VALUES
 - **名称转义** —— 名称中的单引号按 SQL 标准加倍（`'` → `''`）
 - **主键为 UUIDv7** —— 按 RFC 9562 生成，跨毫秒的字符串顺序即时间顺序，索引局部性优于 UUIDv4
 - **PostgreSQL 方言** —— 主键带 `::uuid` 类型转换，`name` 用双引号包裹
+- **输出选项（默认关闭）** —— 可用 `BEGIN` / `COMMIT` 包裹整份脚本；可追加 `ON CONFLICT DO NOTHING`，
+  或 `ON CONFLICT (code) DO UPDATE SET "name" / district_type / parent_code = EXCLUDED.*`（需要 code 上有唯一约束）；
+  输出始终是 UTF-8 无 BOM，批量大小即 `--batch` / 界面里的「每批 INSERT 行数」
 
 > [!NOTE]
 > 主键由 `Guid.CreateVersion7()` 生成（.NET 9+ API），
@@ -136,13 +139,16 @@ VALUES
   "tableName": "public.tb_district",
   "batchSize": 100,
   "dialect": "postgres",
+  "wrapInTransaction": false,
+  "onConflict": "none",
+  "collectAllErrors": false,
   "columns": { "name": "name" }
 }
 ```
 
 - 只写需要修改的项即可，未写的项沿用默认值（默认值与历史输出逐字节一致）
 - 键名大小写不敏感，允许注释与末尾逗号
-- `dialect` 目前只接受 `postgres`
+- `dialect` 目前只接受 `postgres`；`onConflict` 只接受 `none` / `doNothing` / `doUpdate`
 - 校验失败不会中断界面，错误详情写入 `%LOCALAPPDATA%\DistrictJsonToSql\error.log`
 
 ## 项目结构

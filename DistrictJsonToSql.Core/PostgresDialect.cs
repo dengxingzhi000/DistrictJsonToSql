@@ -9,11 +9,13 @@ namespace DistrictJsonToSql
     public sealed class PostgresDialect : ISqlDialect
     {
         private readonly GeneratorOptions _options;
+        private readonly OnConflictMode _onConflict;
 
         public PostgresDialect(GeneratorOptions options)
         {
             _options = options ?? throw new ArgumentNullException(nameof(options));
             _options.Validate();
+            _onConflict = OnConflictModes.Parse(_options.OnConflict);
         }
 
         public int BatchSize
@@ -24,9 +26,25 @@ namespace DistrictJsonToSql
         public string BuildInsertHeader()
         {
             var columns = _options.Columns;
-            return "INSERT INTO " + _options.TableName + " ("
-                   + columns.Guid + ", " + columns.Code + ", \"" + columns.Name + "\", "
-                   + columns.DistrictType + ", " + columns.ParentCode + ") VALUES";
+            var header = "INSERT INTO " + _options.TableName + " ("
+                         + columns.Guid + ", " + columns.Code + ", \"" + columns.Name + "\", "
+                         + columns.DistrictType + ", " + columns.ParentCode + ") VALUES";
+
+            switch (_onConflict)
+            {
+                case OnConflictMode.DoNothing:
+                    // 不带冲突目标：即使表上没有 code 的唯一索引也能执行
+                    return header + " ON CONFLICT DO NOTHING";
+
+                case OnConflictMode.DoUpdate:
+                    return header + " ON CONFLICT (" + columns.Code + ") DO UPDATE SET \""
+                           + columns.Name + "\" = EXCLUDED.\"" + columns.Name + "\", "
+                           + columns.DistrictType + " = EXCLUDED." + columns.DistrictType + ", "
+                           + columns.ParentCode + " = EXCLUDED." + columns.ParentCode;
+
+                default:
+                    return header;
+            }
         }
 
         public string BuildValueTuple(string guid, string code, string name, int districtType, string parentCode)
