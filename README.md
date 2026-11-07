@@ -55,7 +55,7 @@ SQL 的小工具。
 dotnet run --project DistrictJsonToSql.Cli -- --input pcas-code.json --output district.sql --table public.tb_district --batch 100
 ```
 
-参数：`--input`（必填）、`--output`（必填，UTF-8 无 BOM）、`--table`（默认 `public.tb_district`）、`--batch`（默认 100）、`--help`。
+参数：`--input`（必填）、`--output`（必填，UTF-8 无 BOM）、`--table`（默认 `public.tb_district`）、`--batch`（默认 100）、`--all-errors`（校验失败时汇总输出全部问题，默认只报第一条）、`--help`。
 退出码：`0` 成功、`1` 未预期错误、`2` 参数错误、`3` 输入读取失败、`4` 数据校验失败、`5` 输出写入失败；错误信息一律走 stderr，stdout 只放正常输出。
 
 ### 输入 JSON
