@@ -30,6 +30,7 @@ namespace DistrictJsonToSql
             var defaults = GeneratorOptions.LoadDefault();
             TableName = defaults.TableName;
             BatchSizeText = defaults.BatchSize.ToString(CultureInfo.InvariantCulture);
+            CollectAllErrors = defaults.CollectAllErrors;
         }
 
         [ObservableProperty]
@@ -44,6 +45,10 @@ namespace DistrictJsonToSql
         /// <summary>高级选项：每条 INSERT 的批量行数（保持字符串，便于直接绑定输入框）。</summary>
         [ObservableProperty]
         private string _batchSizeText = "100";
+
+        /// <summary>高级选项：一次性汇总全部校验错误；默认 false（首错即抛）。</summary>
+        [ObservableProperty]
+        private bool _collectAllErrors;
 
         [ObservableProperty]
         private string _sqlText = string.Empty;
@@ -175,7 +180,7 @@ namespace DistrictJsonToSql
 
                 var sqlFileName = Path.ChangeExtension(path, ".sql");
                 var result = await Task.Run(() => SqlGenerator.GenerateSqlToFile(
-                    districts, sqlFileName, dialect, PreviewLineLimit, progress));
+                    districts, sqlFileName, dialect, PreviewLineLimit, progress, options.CollectAllErrors));
 
                 SqlText = result.PreviewText;
                 HasOutput = true;
@@ -195,10 +200,12 @@ namespace DistrictJsonToSql
             catch (DistrictValidationException ex)
             {
                 ErrorLogger.Log("validate " + ex.NodePath, ex);
-                ShowStatus(StatusSeverity.Error, "数据校验失败", "位置 " + ex.NodePath);
-                await _dialogs.ShowErrorAsync(
+                var issueCount = ex.Issues == null ? 1 : ex.Issues.Count;
+                ShowStatus(
+                    StatusSeverity.Error,
                     "数据校验失败",
-                    $"行政区划数据不合法（位置 {ex.NodePath}）：{ex.Message}\n\n详细信息见：{ErrorLogger.LogPath}");
+                    issueCount > 1 ? $"共 {issueCount} 处问题，首处位置 {ex.NodePath}" : "位置 " + ex.NodePath);
+                await _dialogs.ShowErrorAsync("数据校验失败", BuildValidationMessage(ex));
             }
             catch (Exception ex)
             {
@@ -234,7 +241,36 @@ namespace DistrictJsonToSql
             var options = GeneratorOptions.LoadDefault();
             options.TableName = tableName;
             options.BatchSize = batchSize;
+            options.CollectAllErrors = CollectAllErrors;
             return options;
+        }
+
+        /// <summary>校验失败弹窗文案；汇总模式下最多列出前 20 条，避免弹窗过长。</summary>
+        private static string BuildValidationMessage(DistrictValidationException ex)
+        {
+            var issues = ex.Issues;
+            if (issues == null || issues.Count <= 1)
+            {
+                return $"行政区划数据不合法（位置 {ex.NodePath}）：{ex.Message}\n\n详细信息见：{ErrorLogger.LogPath}";
+            }
+
+            const int maxIssuesInDialog = 20;
+            var shown = Math.Min(issues.Count, maxIssuesInDialog);
+            var builder = new System.Text.StringBuilder();
+            builder.AppendLine($"行政区划数据有 {issues.Count} 处不合法，前 {shown} 处：");
+            for (var i = 0; i < shown; i++)
+            {
+                builder.AppendLine($"{i + 1}. {issues[i].Message}");
+            }
+
+            if (issues.Count > shown)
+            {
+                builder.AppendLine($"…另有 {issues.Count - shown} 处未列出。");
+            }
+
+            builder.AppendLine();
+            builder.Append("详细信息见：" + ErrorLogger.LogPath);
+            return builder.ToString();
         }
 
         private void ShowStatus(StatusSeverity severity, string title, string message)

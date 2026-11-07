@@ -294,6 +294,40 @@ namespace DistrictJsonToSql.Tests
             }
         }
 
+        [Fact]
+        public async Task Generate_CollectAllErrors_ShowsAggregatedDialog()
+        {
+            var directory = CreateTempDirectory();
+            try
+            {
+                // 两个独立问题：[0] code 位数不对；[2] code 与 [1] 重复
+                var jsonPath = WriteJson(
+                    directory,
+                    "[{\"code\":\"1\",\"name\":\"甲\"},{\"code\":\"11\",\"name\":\"乙\"},{\"code\":\"11\",\"name\":\"丙\"}]");
+                var viewModel = CreateViewModel(out var picker, out var dialogs);
+                viewModel.CollectAllErrors = true;
+                picker.PathToReturn = jsonPath;
+                await viewModel.SelectFileCommand.ExecuteAsync(null);
+
+                await viewModel.GenerateSqlCommand.ExecuteAsync(null);
+
+                Assert.False(viewModel.HasOutput);
+                Assert.Equal(StatusSeverity.Error, viewModel.StatusSeverity);
+                Assert.Equal("数据校验失败", viewModel.StatusTitle);
+                Assert.Contains("共 2 处问题", viewModel.StatusMessage);
+
+                var error = Assert.Single(dialogs.Errors);
+                Assert.Equal("数据校验失败", error.Title);
+                Assert.Contains("2 处不合法", error.Message);
+                Assert.Contains("[0]", error.Message);
+                Assert.Contains("[2]", error.Message);
+            }
+            finally
+            {
+                Directory.Delete(directory, true);
+            }
+        }
+
         private static int CountLines(string text)
         {
             return text.Replace("\r\n", "\n").Split('\n').Length - 1;

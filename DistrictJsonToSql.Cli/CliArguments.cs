@@ -16,6 +16,9 @@ namespace DistrictJsonToSql.Cli
 
         public int? BatchSize { get; private set; }
 
+        /// <summary>为真时一次性汇总全部校验错误（默认仍首错即抛）。</summary>
+        public bool AllErrors { get; private set; }
+
         public static CliArguments Parse(string[] args)
         {
             var result = new CliArguments();
@@ -59,6 +62,10 @@ namespace DistrictJsonToSql.Cli
                         }
 
                         result.BatchSize = batch;
+                        break;
+
+                    case "--all-errors":
+                        result.AllErrors = true;
                         break;
 
                     default:

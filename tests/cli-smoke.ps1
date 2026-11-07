@@ -88,6 +88,26 @@ try {
         throw "[校验失败] stderr 未提示校验失败：$($invalid.StdErr)"
     }
 
+    # 5b. 校验汇总：--all-errors 一次性输出全部问题，退出码仍是 4
+    $multiBadJson = Join-Path $workDir "multi-bad.json"
+    Set-Content -Path $multiBadJson -Value '[{"code":"1","name":"甲"},{"code":"11","name":"乙"},{"code":"11","name":"丙"}]' -Encoding utf8
+
+    $aggregated = Invoke-Cli @("--input", $multiBadJson, "--output", $sqlPath, "--all-errors")
+    Assert-ExitCode $aggregated 4 "校验汇总"
+    if ($aggregated.StdErr -notmatch "共 2 处") {
+        throw "[校验汇总] stderr 未给出总数：$($aggregated.StdErr)"
+    }
+    if (($aggregated.StdErr -notmatch "\[0\]") -or ($aggregated.StdErr -notmatch "\[2\]")) {
+        throw "[校验汇总] stderr 未列出所有路径：$($aggregated.StdErr)"
+    }
+
+    # 默认仍首错即抛：不出现汇总标题
+    $single = Invoke-Cli @("--input", $multiBadJson, "--output", $sqlPath)
+    Assert-ExitCode $single 4 "首错即抛"
+    if ($single.StdErr -match "共 2 处") {
+        throw "[首错即抛] 默认不应汇总：$($single.StdErr)"
+    }
+
     # 6. 写盘失败 → 5
     $badOutput = Join-Path (Join-Path $workDir "no-such-dir") "out.sql"
     $writeFailure = Invoke-Cli @("--input", $Sample, "--output", $badOutput)

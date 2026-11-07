@@ -38,7 +38,7 @@ namespace DistrictJsonToSql
             }
 
             var items = districts.ToList();
-            Validate(items);
+            ValidateCore(items, stopAtFirst: true);
 
             var tuples = new List<string>();
             foreach (var item in items)
@@ -72,7 +72,8 @@ namespace DistrictJsonToSql
             string sqlFilePath,
             ISqlDialect dialect,
             int previewLineLimit,
-            IProgress<SqlGenerationProgress> progress)
+            IProgress<SqlGenerationProgress> progress,
+            bool collectAllErrors = false)
         {
             if (districts == null)
             {
@@ -95,7 +96,18 @@ namespace DistrictJsonToSql
             }
 
             var items = districts.ToList();
-            Validate(items);
+            if (collectAllErrors)
+            {
+                var issues = ValidateCore(items, stopAtFirst: false);
+                if (issues.Count > 0)
+                {
+                    throw new DistrictValidationException(issues[0].Message, issues[0].NodePath, issues);
+                }
+            }
+            else
+            {
+                ValidateCore(items, stopAtFirst: true);
+            }
 
             var nodesTotal = CountNodes(items);
             var nodesDone = 0;
@@ -257,7 +269,22 @@ namespace DistrictJsonToSql
             return depth == 2 ? node.Code + "00" : node.Code;
         }
 
-        private static void Validate(List<DistrictItem> items)
+        /// <summary>收集全部校验问题，顺序为深度优先（与首错模式下报出的第一条完全一致）。</summary>
+        public static IReadOnlyList<DistrictValidationIssue> ValidateAll(IEnumerable<DistrictItem> districts)
+        {
+            if (districts == null)
+            {
+                throw new ArgumentNullException(nameof(districts));
+            }
+
+            return ValidateCore(districts.ToList(), stopAtFirst: false);
+        }
+
+        /// <summary>
+        /// 统一遍历：<paramref name="stopAtFirst"/> 为真时遇到第一条问题立即抛异常（历史行为，异常文案/路径不变）；
+        /// 为假时收集全部问题，每个节点最多记一条（与首错模式在同一节点上报出的那条相同）。
+        /// </summary>
+        private static List<DistrictValidationIssue> ValidateCore(List<DistrictItem> items, bool stopAtFirst)
         {
             var seenCodes = new Dictionary<int, HashSet<string>>();
             for (var level = 1; level <= MaxDepth; level++)
@@ -265,42 +292,63 @@ namespace DistrictJsonToSql
                 seenCodes[level] = new HashSet<string>(StringComparer.Ordinal);
             }
 
+            var issues = new List<DistrictValidationIssue>();
             for (var i = 0; i < items.Count; i++)
             {
-                ValidateNode(items[i], 1, "[" + i + "]", seenCodes);
+                ValidateNode(items[i], 1, "[" + i + "]", seenCodes, issues, stopAtFirst);
             }
+
+            return issues;
         }
 
-        private static void ValidateNode(DistrictItem node, int depth, string path, Dictionary<int, HashSet<string>> seenCodes)
+        private static void ValidateNode(
+            DistrictItem node,
+            int depth,
+            string path,
+            Dictionary<int, HashSet<string>> seenCodes,
+            List<DistrictValidationIssue> issues,
+            bool stopAtFirst)
         {
+            void Fail(string message)
+            {
+                if (stopAtFirst)
+                {
+                    throw new DistrictValidationException(message, path);
+                }
+
+                issues.Add(new DistrictValidationIssue(path, message));
+            }
+
             if (depth > MaxDepth)
             {
-                throw new DistrictValidationException(
-                    "行政区划最多支持 " + MaxDepth + " 级，却发现第 " + depth + " 级节点：" + path, path);
+                Fail("行政区划最多支持 " + MaxDepth + " 级，却发现第 " + depth + " 级节点：" + path);
+                return;
             }
 
             if (node == null)
             {
-                throw new DistrictValidationException("第 " + depth + " 级存在空节点：" + path, path);
+                Fail("第 " + depth + " 级存在空节点：" + path);
+                return;
             }
 
             if (string.IsNullOrWhiteSpace(node.Name))
             {
-                throw new DistrictValidationException("第 " + depth + " 级节点缺少 name：" + path + " code=" + node.Code, path);
+                Fail("第 " + depth + " 级节点缺少 name：" + path + " code=" + node.Code);
+                return;
             }
 
             if (node.Code == null || node.Code.Length != ExpectedCodeLengths[depth - 1] || !IsDigitsOnly(node.Code))
             {
-                throw new DistrictValidationException(
-                    "第 " + depth + " 级 code 应为 " + ExpectedCodeLengths[depth - 1] + " 位数字，实际为 "
-                    + (node.Code == null ? "null" : node.Code.Length + " 位（" + node.Code + "）")
-                    + "：" + path + " name=" + node.Name, path);
+                Fail("第 " + depth + " 级 code 应为 " + ExpectedCodeLengths[depth - 1] + " 位数字，实际为 "
+                     + (node.Code == null ? "null" : node.Code.Length + " 位（" + node.Code + "）")
+                     + "：" + path + " name=" + node.Name);
+                return;
             }
 
             if (!seenCodes[depth].Add(node.Code))
             {
-                throw new DistrictValidationException(
-                    "第 " + depth + " 级 code 重复：" + path + " code=" + node.Code + " name=" + node.Name, path);
+                Fail("第 " + depth + " 级 code 重复：" + path + " code=" + node.Code + " name=" + node.Name);
+                return;
             }
 
             if (node.Children == null)
@@ -310,7 +358,7 @@ namespace DistrictJsonToSql
 
             for (var i = 0; i < node.Children.Count; i++)
             {
-                ValidateNode(node.Children[i], depth + 1, path + ".children[" + i + "]", seenCodes);
+                ValidateNode(node.Children[i], depth + 1, path + ".children[" + i + "]", seenCodes, issues, stopAtFirst);
             }
         }
 

@@ -24,6 +24,9 @@ namespace DistrictJsonToSql
         public string TableName { get; set; } = "public.tb_district";
         public int BatchSize { get; set; } = 100;
         public string Dialect { get; set; } = "postgres";
+
+        /// <summary>为真时一次性汇总全部校验错误；默认 false，保持首错即抛。</summary>
+        public bool CollectAllErrors { get; set; } = false;
         public ColumnNames Columns { get; set; } = new ColumnNames();
 
         public static GeneratorOptions LoadDefault()
