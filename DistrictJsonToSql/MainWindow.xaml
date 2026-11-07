@@ -126,6 +126,13 @@
                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                        Visibility="{Binding ShowGenerateHint, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
 
+            <TextBlock Grid.Column="0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                       Text="{Binding ProgressText, Mode=OneWay}"
+                       Style="{StaticResource CaptionTextBlockStyle}"
+                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                       AutomationProperties.Name="生成进度"
+                       Visibility="{Binding HasProgressText, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
+
             <ProgressRing Grid.Column="1" Width="20" Height="20" VerticalAlignment="Center"
                           IsActive="{Binding IsBusy, Mode=OneWay}"
                           Visibility="{Binding IsBusy, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
@@ -161,6 +168,7 @@
             <Grid RowSpacing="8">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
 
@@ -180,7 +188,16 @@
                                Visibility="{Binding ShowOutput, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
                 </Grid>
 
-                <Grid Grid.Row="1">
+                <!-- 预览被截断时明确告知完整行数与写盘结果，避免用户误以为只生成了这些 -->
+                <TextBlock Grid.Row="1"
+                           Text="{Binding PreviewNotice, Mode=OneWay}"
+                           Style="{StaticResource CaptionTextBlockStyle}"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                           TextWrapping="Wrap"
+                           AutomationProperties.Name="预览截断提示"
+                           Visibility="{Binding IsPreviewTruncated, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
+
+                <Grid Grid.Row="2">
                     <StackPanel x:Name="EmptyState"
                                 Visibility="{Binding ShowEmptyState, Mode=OneWay, Converter={StaticResource BoolToVisibility}}"
                                 HorizontalAlignment="Center" VerticalAlignment="Center"

@@ -103,7 +103,82 @@ try {
         throw "[--help] stdout 缺少用法说明"
     }
 
-    Write-Host "CLI smoke 全部通过：golden 一致，退出码 0/2/3/4/5 均符合预期。"
+    # 8. 大文件：100,820 个节点，断言行数精确、退出码 0（不做耗时/内存断言）
+    $bigJson = Join-Path $workDir "big.json"
+    $provinces = 20
+    $citiesPerProvince = 40
+    $districtsPerCity = 125
+    $sb = New-Object System.Text.StringBuilder
+    [void]$sb.Append("[")
+    $cityIndex = 0
+    $districtIndex = 0
+    for ($p = 0; $p -lt $provinces; $p++) {
+        if ($p -gt 0) { [void]$sb.Append(",") }
+        [void]$sb.Append('{"code":"').Append(($p + 1).ToString("D2")).Append('","name":"省').Append($p).Append('","children":[')
+        for ($c = 0; $c -lt $citiesPerProvince; $c++) {
+            if ($c -gt 0) { [void]$sb.Append(",") }
+            $cityIndex++
+            [void]$sb.Append('{"code":"').Append($cityIndex.ToString("D4")).Append('","name":"市').Append($c).Append('","children":[')
+            for ($d = 0; $d -lt $districtsPerCity; $d++) {
+                if ($d -gt 0) { [void]$sb.Append(",") }
+                $districtIndex++
+                [void]$sb.Append('{"code":"').Append($districtIndex.ToString("D6")).Append('","name":"区').Append($d).Append('"}')
+            }
+            [void]$sb.Append("]}")
+        }
+        [void]$sb.Append("]}")
+    }
+    [void]$sb.Append("]")
+    [IO.File]::WriteAllText($bigJson, $sb.ToString(), (New-Object System.Text.UTF8Encoding($false)))
+
+    $bigSql = Join-Path $workDir "big.sql"
+    $big = Invoke-Cli @("--input", $bigJson, "--output", $bigSql, "--batch", "100")
+    Assert-ExitCode $big 0 "大文件"
+    if ($big.StdErr -ne "") {
+        throw "[大文件] stderr 应为空，实际：$($big.StdErr)"
+    }
+    if ($big.StdOut -notmatch "已生成 100820 个行政区划节点") {
+        throw "[大文件] stdout 节点数不符：$($big.StdOut)"
+    }
+
+    # 100,820 个节点按 100 一批 => 1009 批；行数 = 3 + 1009 * 2 + 100,820 = 102,841
+    $bigLines = @([IO.File]::ReadAllLines($bigSql)).Count
+    if ($bigLines -ne 102841) {
+        throw "[大文件] 行数应为 102841，实际 $bigLines"
+    }
+
+    $stream = [IO.File]::OpenRead($bigSql)
+    try {
+        $buffer = New-Object byte[] 3
+        [void]$stream.Read($buffer, 0, 3)
+    }
+    finally {
+        $stream.Dispose()
+    }
+    if ($buffer[0] -eq 0xEF -and $buffer[1] -eq 0xBB -and $buffer[2] -eq 0xBF) {
+        throw "[大文件] 输出带有 UTF-8 BOM"
+    }
+
+    # 仅用于 PR 正文记录：打印耗时与峰值工作集，不做任何断言
+    $metricsSql = Join-Path $workDir "metrics.sql"
+    $stopwatch = [Diagnostics.Stopwatch]::StartNew()
+    $process = Start-Process -FilePath "dotnet" -ArgumentList @($CliDll, "--input", $bigJson, "--output", $metricsSql, "--batch", "100") -PassThru -NoNewWindow
+    $peak = 0
+    while (-not $process.HasExited) {
+        $process.Refresh()
+        try {
+            $current = $process.WorkingSet64
+            if ($current -gt $peak) { $peak = $current }
+        }
+        catch {
+            # 进程刚退出时读取属性会抛，忽略
+        }
+        Start-Sleep -Milliseconds 50
+    }
+    $stopwatch.Stop()
+    Write-Host ("METRICS nodes=100820 lines=102841 elapsed_ms={0} peak_working_set_mb={1:N1} output_bytes={2}" -f $stopwatch.ElapsedMilliseconds, ($peak / 1MB), (Get-Item $metricsSql).Length)
+
+    Write-Host "CLI smoke 全部通过：golden 一致，退出码 0/2/3/4/5 均符合预期，10 万节点行数精确。"
 }
 finally {
     Remove-Item $workDir -Recurse -Force -ErrorAction SilentlyContinue

@@ -13,6 +13,9 @@ namespace DistrictJsonToSql
     /// </summary>
     public partial class MainViewModel : ObservableObject
     {
+        /// <summary>预览只显示前 200 行；写盘始终是全量，截断时会同时提示完整行数。</summary>
+        public const int PreviewLineLimit = 200;
+
         private readonly IDistrictReader _reader;
         private readonly IFilePickerService _filePicker;
         private readonly IDialogService _dialogs;
@@ -72,9 +75,27 @@ namespace DistrictJsonToSql
         [ObservableProperty]
         private StatusSeverity _statusSeverity = StatusSeverity.Informational;
 
+        /// <summary>生成进度文本（读取中 / 已生成 x / y 个节点）。</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(HasProgressText))]
+        private string _progressText = string.Empty;
+
+        /// <summary>预览被截断时的提示文案，例如「共 108,432 行，仅预览前 200 行」。</summary>
+        [ObservableProperty]
+        private string _previewNotice = string.Empty;
+
+        [ObservableProperty]
+        private bool _isPreviewTruncated;
+
+        /// <summary>完整输出（写盘文件）的行数。</summary>
+        [ObservableProperty]
+        private int _totalLineCount;
+
         public bool ShowOutput => HasOutput;
 
         public bool ShowEmptyState => !HasOutput;
+
+        public bool HasProgressText => !string.IsNullOrEmpty(ProgressText);
 
         /// <summary>生成按钮不可用时，在操作区给出明确原因（而不是只有禁用态）。</summary>
         public bool ShowGenerateHint => !IsBusy && SelectedFilePath == null;
@@ -96,6 +117,10 @@ namespace DistrictJsonToSql
             HasOutput = false;
             SqlText = string.Empty;
             OutputFilePath = string.Empty;
+            ProgressText = string.Empty;
+            PreviewNotice = string.Empty;
+            IsPreviewTruncated = false;
+            TotalLineCount = 0;
             ShowStatus(StatusSeverity.Informational, "文件已选择", "点击「生成 SQL」开始生成");
         }
 
@@ -120,6 +145,10 @@ namespace DistrictJsonToSql
             }
 
             IsBusy = true;
+            ProgressText = "正在读取 JSON…";
+            PreviewNotice = string.Empty;
+            IsPreviewTruncated = false;
+            TotalLineCount = 0;
             ShowStatus(StatusSeverity.Informational, "正在读取 JSON", Path.GetFileName(path));
 
             try
@@ -133,15 +162,35 @@ namespace DistrictJsonToSql
 
                 ShowStatus(StatusSeverity.Informational, "正在生成 SQL", $"共 {districts.Count} 个行政区划节点，正在生成…");
                 var dialect = SqlGenerator.CreateDialect(options);
-                var sql = await Task.Run(() => SqlGenerator.GenerateSql(districts, dialect));
+
+                // Progress<T> 在 UI 线程上创建，回调会回到 UI 线程；只更新文本，不碰界面对象
+                ProgressText = "正在生成 SQL…";
+                var progress = new Progress<SqlGenerationProgress>(p =>
+                {
+                    if (IsBusy)
+                    {
+                        ProgressText = $"正在生成 SQL… {p.NodesDone:N0} / {p.NodesTotal:N0} 个节点";
+                    }
+                });
 
                 var sqlFileName = Path.ChangeExtension(path, ".sql");
-                SqlGenerator.WriteSqlFile(sqlFileName, sql);
+                var result = await Task.Run(() => SqlGenerator.GenerateSqlToFile(
+                    districts, sqlFileName, dialect, PreviewLineLimit, progress));
 
-                SqlText = sql;
+                SqlText = result.PreviewText;
                 HasOutput = true;
                 OutputFilePath = sqlFileName;
-                ShowStatus(StatusSeverity.Success, "生成完成", sqlFileName);
+                TotalLineCount = result.TotalLines;
+                IsPreviewTruncated = result.PreviewTruncated;
+                PreviewNotice = result.PreviewTruncated
+                    ? $"共 {result.TotalLines:N0} 行，仅预览前 {PreviewLineLimit} 行（完整内容已写入 {Path.GetFileName(sqlFileName)}）"
+                    : string.Empty;
+                ShowStatus(
+                    StatusSeverity.Success,
+                    "生成完成",
+                    result.PreviewTruncated
+                        ? $"共 {result.TotalLines:N0} 行，已写入 {sqlFileName}"
+                        : sqlFileName);
             }
             catch (DistrictValidationException ex)
             {
@@ -162,6 +211,7 @@ namespace DistrictJsonToSql
             finally
             {
                 IsBusy = false;
+                ProgressText = string.Empty;
             }
         }
 

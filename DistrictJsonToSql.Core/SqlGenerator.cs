@@ -43,7 +43,7 @@ namespace DistrictJsonToSql
             var tuples = new List<string>();
             foreach (var item in items)
             {
-                Collect(item, 1, null, tuples, dialect);
+                tuples.AddRange(Collect(item, 1, null, dialect));
             }
 
             var sqlBuilder = new StringBuilder();
@@ -60,6 +60,125 @@ namespace DistrictJsonToSql
             }
 
             return sqlBuilder.ToString();
+        }
+
+        /// <summary>
+        /// 边生成边按批写入文件，不在内存里保留整份 SQL 文本；返回节点数、实际行数与前若干行预览。
+        /// 输出与 <see cref="GenerateSql(IEnumerable{DistrictItem}, ISqlDialect)"/> 逐字节一致（行尾、批次分隔、末尾空行都相同）。
+        /// </summary>
+        /// <param name="previewLineLimit">预览保留的最大行数；0 表示不保留预览。写盘始终是全量。</param>
+        public static SqlGenerationResult GenerateSqlToFile(
+            IEnumerable<DistrictItem> districts,
+            string sqlFilePath,
+            ISqlDialect dialect,
+            int previewLineLimit,
+            IProgress<SqlGenerationProgress> progress)
+        {
+            if (districts == null)
+            {
+                throw new ArgumentNullException(nameof(districts));
+            }
+
+            if (dialect == null)
+            {
+                throw new ArgumentNullException(nameof(dialect));
+            }
+
+            if (string.IsNullOrWhiteSpace(sqlFilePath))
+            {
+                throw new ArgumentException("输出文件路径不能为空", nameof(sqlFilePath));
+            }
+
+            if (previewLineLimit < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(previewLineLimit), "预览行数不能为负数");
+            }
+
+            var items = districts.ToList();
+            Validate(items);
+
+            var nodesTotal = CountNodes(items);
+            var nodesDone = 0;
+            var totalLines = 0;
+            var previewLines = 0;
+            var preview = new StringBuilder();
+            var batch = new List<string>(dialect.BatchSize);
+
+            using (var stream = new FileStream(sqlFilePath, FileMode.Create, FileAccess.Write, FileShare.Read))
+            using (var writer = new StreamWriter(stream, new UTF8Encoding(false)))
+            {
+                writer.NewLine = Environment.NewLine;
+
+                // 预览只保留前 previewLineLimit 个物理行，用于界面展示
+                void AppendPreview(string text)
+                {
+                    if (previewLines >= previewLineLimit)
+                    {
+                        return;
+                    }
+
+                    preview.Append(text).Append(Environment.NewLine);
+                    previewLines++;
+                }
+
+                // 标题行、空行：一个物理行
+                void WriteSimpleLine(string text = "")
+                {
+                    writer.WriteLine(text);
+                    totalLines++;
+                    AppendPreview(text);
+                }
+
+                void FlushBatch()
+                {
+                    if (batch.Count == 0)
+                    {
+                        return;
+                    }
+
+                    WriteSimpleLine(dialect.BuildInsertHeader());
+
+                    // 与 GenerateSql 完全一致：批次内部用 \n 连接，最后一条加 ";" 后整体换行
+                    writer.WriteLine(string.Join(",\n", batch) + ";");
+                    totalLines += batch.Count;
+
+                    for (var i = 0; i < batch.Count; i++)
+                    {
+                        AppendPreview(i == batch.Count - 1 ? batch[i] + ";" : batch[i] + ",");
+                    }
+
+                    WriteSimpleLine();
+                    batch.Clear();
+                }
+
+                WriteSimpleLine("-- 地域数据插入SQL");
+                WriteSimpleLine("-- 生成时间: " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+                WriteSimpleLine();
+
+                foreach (var item in items)
+                {
+                    foreach (var tuple in Collect(item, 1, null, dialect))
+                    {
+                        batch.Add(tuple);
+                        nodesDone++;
+
+                        if (batch.Count == dialect.BatchSize)
+                        {
+                            FlushBatch();
+                            progress?.Report(new SqlGenerationProgress(nodesDone, nodesTotal));
+                        }
+                    }
+                }
+
+                FlushBatch();
+                progress?.Report(new SqlGenerationProgress(nodesDone, nodesTotal));
+            }
+
+            return new SqlGenerationResult(
+                nodesDone,
+                totalLines,
+                preview.ToString(),
+                totalLines > previewLineLimit);
         }
 
         public static ISqlDialect CreateDialect(GeneratorOptions options)
@@ -81,21 +200,51 @@ namespace DistrictJsonToSql
             File.WriteAllText(sqlFilePath, sql, new UTF8Encoding(false));
         }
 
-        /// <summary>递归展开节点树，替代此前的四层嵌套循环。</summary>
-        private static void Collect(DistrictItem node, int depth, string parentCode, List<string> output, ISqlDialect dialect)
+        /// <summary>递归展开节点树，按深度优先逐条产出 VALUES 元组（用于大文件流式写入）。</summary>
+        private static IEnumerable<string> Collect(DistrictItem node, int depth, string parentCode, ISqlDialect dialect)
         {
             var code = EffectiveCode(node, depth);
-            output.Add(dialect.BuildValueTuple(Guid.CreateVersion7().ToString(), code, node.Name, depth, parentCode));
+            yield return dialect.BuildValueTuple(Guid.CreateVersion7().ToString(), code, node.Name, depth, parentCode);
 
             if (node.Children == null)
             {
-                return;
+                yield break;
             }
 
             foreach (var child in node.Children)
             {
-                Collect(child, depth + 1, code, output, dialect);
+                foreach (var tuple in Collect(child, depth + 1, code, dialect))
+                {
+                    yield return tuple;
+                }
             }
+        }
+
+        private static int CountNodes(List<DistrictItem> items)
+        {
+            var count = 0;
+            foreach (var item in items)
+            {
+                count += CountNode(item);
+            }
+
+            return count;
+        }
+
+        private static int CountNode(DistrictItem node)
+        {
+            var count = 1;
+            if (node.Children == null)
+            {
+                return count;
+            }
+
+            foreach (var child in node.Children)
+            {
+                count += CountNode(child);
+            }
+
+            return count;
         }
 
         private static string EffectiveCode(DistrictItem node, int depth)
