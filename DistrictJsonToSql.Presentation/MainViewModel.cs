@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.IO;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -21,14 +22,32 @@ namespace DistrictJsonToSql
             _reader = reader ?? throw new ArgumentNullException(nameof(reader));
             _filePicker = filePicker ?? throw new ArgumentNullException(nameof(filePicker));
             _dialogs = dialogs ?? throw new ArgumentNullException(nameof(dialogs));
+
+            // 高级参数初始值仍来自 exe 同目录的同名配置，行为与之前一致
+            var defaults = GeneratorOptions.LoadDefault();
+            TableName = defaults.TableName;
+            BatchSizeText = defaults.BatchSize.ToString(CultureInfo.InvariantCulture);
         }
 
         [ObservableProperty]
         [NotifyCanExecuteChangedFor(nameof(GenerateSqlCommand))]
+        [NotifyPropertyChangedFor(nameof(ShowGenerateHint))]
         private string _selectedFilePath;
+
+        /// <summary>高级选项：目标表名。</summary>
+        [ObservableProperty]
+        private string _tableName = "public.tb_district";
+
+        /// <summary>高级选项：每条 INSERT 的批量行数（保持字符串，便于直接绑定输入框）。</summary>
+        [ObservableProperty]
+        private string _batchSizeText = "100";
 
         [ObservableProperty]
         private string _sqlText = string.Empty;
+
+        /// <summary>生成后写出的 SQL 文件完整路径，显示在结果区标题右侧。</summary>
+        [ObservableProperty]
+        private string _outputFilePath = string.Empty;
 
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(ShowOutput))]
@@ -36,6 +55,7 @@ namespace DistrictJsonToSql
         private bool _hasOutput;
 
         [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(ShowGenerateHint))]
         [NotifyCanExecuteChangedFor(nameof(SelectFileCommand))]
         [NotifyCanExecuteChangedFor(nameof(GenerateSqlCommand))]
         private bool _isBusy;
@@ -56,6 +76,9 @@ namespace DistrictJsonToSql
 
         public bool ShowEmptyState => !HasOutput;
 
+        /// <summary>生成按钮不可用时，在操作区给出明确原因（而不是只有禁用态）。</summary>
+        public bool ShowGenerateHint => !IsBusy && SelectedFilePath == null;
+
         private bool CanSelectFile() => !IsBusy;
 
         private bool CanGenerateSql() => !IsBusy && SelectedFilePath != null;
@@ -72,6 +95,7 @@ namespace DistrictJsonToSql
             SelectedFilePath = path;
             HasOutput = false;
             SqlText = string.Empty;
+            OutputFilePath = string.Empty;
             ShowStatus(StatusSeverity.Informational, "文件已选择", "点击「生成 SQL」开始生成");
         }
 
@@ -81,6 +105,17 @@ namespace DistrictJsonToSql
             var path = SelectedFilePath;
             if (path == null)
             {
+                return;
+            }
+
+            GeneratorOptions options;
+            try
+            {
+                options = BuildOptions();
+            }
+            catch (ArgumentException ex)
+            {
+                ShowStatus(StatusSeverity.Error, "参数不合法", ex.Message);
                 return;
             }
 
@@ -97,13 +132,15 @@ namespace DistrictJsonToSql
                 }
 
                 ShowStatus(StatusSeverity.Informational, "正在生成 SQL", $"共 {districts.Count} 个行政区划节点，正在生成…");
-                var sql = await Task.Run(() => SqlGenerator.GenerateSql(districts));
+                var dialect = SqlGenerator.CreateDialect(options);
+                var sql = await Task.Run(() => SqlGenerator.GenerateSql(districts, dialect));
 
                 var sqlFileName = Path.ChangeExtension(path, ".sql");
                 SqlGenerator.WriteSqlFile(sqlFileName, sql);
 
                 SqlText = sql;
                 HasOutput = true;
+                OutputFilePath = sqlFileName;
                 ShowStatus(StatusSeverity.Success, "生成完成", sqlFileName);
             }
             catch (DistrictValidationException ex)
@@ -126,6 +163,28 @@ namespace DistrictJsonToSql
             {
                 IsBusy = false;
             }
+        }
+
+        /// <summary>把高级选项校验并合并到配置；不合法时抛 <see cref="ArgumentException"/>（文案给用户看）。</summary>
+        private GeneratorOptions BuildOptions()
+        {
+            var tableName = (TableName ?? string.Empty).Trim();
+            if (tableName.Length == 0)
+            {
+                throw new ArgumentException("目标表名不能为空");
+            }
+
+            int batchSize;
+            if (!int.TryParse((BatchSizeText ?? string.Empty).Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out batchSize)
+                || batchSize < 1)
+            {
+                throw new ArgumentException("每批 INSERT 行数必须是大于 0 的整数");
+            }
+
+            var options = GeneratorOptions.LoadDefault();
+            options.TableName = tableName;
+            options.BatchSize = batchSize;
+            return options;
         }
 
         private void ShowStatus(StatusSeverity severity, string title, string message)

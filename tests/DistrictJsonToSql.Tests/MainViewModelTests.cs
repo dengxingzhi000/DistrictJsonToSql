@@ -196,6 +196,33 @@ namespace DistrictJsonToSql.Tests
         }
 
         [Fact]
+        public async Task Generate_InvalidBatchSize_ShowsParameterErrorWithoutWriting()
+        {
+            var directory = CreateTempDirectory();
+            try
+            {
+                var jsonPath = WriteJson(directory, "[{\"code\":\"11\",\"name\":\"北京市\"}]");
+                var viewModel = CreateViewModel(out var picker, out var dialogs);
+                picker.PathToReturn = jsonPath;
+                await viewModel.SelectFileCommand.ExecuteAsync(null);
+                viewModel.BatchSizeText = "0";
+
+                await viewModel.GenerateSqlCommand.ExecuteAsync(null);
+
+                Assert.False(viewModel.HasOutput);
+                Assert.False(viewModel.IsBusy);
+                Assert.Equal(StatusSeverity.Error, viewModel.StatusSeverity);
+                Assert.Equal("参数不合法", viewModel.StatusTitle);
+                Assert.Empty(dialogs.Errors);
+                Assert.False(File.Exists(Path.ChangeExtension(jsonPath, ".sql")));
+            }
+            finally
+            {
+                Directory.Delete(directory, true);
+            }
+        }
+
+        [Fact]
         public async Task Generate_UnexpectedException_ShowsErrorDialog()
         {
             var directory = CreateTempDirectory();
