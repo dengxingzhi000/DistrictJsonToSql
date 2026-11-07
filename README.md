@@ -4,10 +4,12 @@
 
 ### 一键把四级行政区划 JSON 转换为 PostgreSQL 批量插入脚本。
 
-**.NET 10 WinForms，自包含单文件发布，双击即用、离线运行。
+**.NET 10 + WinUI 3（Fluent Design），自包含单文件发布，双击即用、离线运行。
 UUIDv7 主键时间有序，索引写入更友好。**
 
 [![.NET](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet&logoColor=white&style=flat-square)](https://dotnet.microsoft.com/)
+[![WinUI 3](https://img.shields.io/badge/WinUI-3%20%2F%20Windows%20App%20SDK%202.6.5-0067C0?style=flat-square)](https://learn.microsoft.com/windows/apps/winui/winui3/)
+[![Windows](https://img.shields.io/badge/Windows-10%201809%2B-0078D4?logo=windows&logoColor=white&style=flat-square)](#系统要求)
 [![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)](#许可证)
 
 [使用方式](#使用方式) · [转换规则](#转换规则) · [项目结构](#项目结构)
@@ -17,9 +19,10 @@ UUIDv7 主键时间有序，索引写入更友好。**
 </div>
 
 > [!NOTE]
-> 目标框架是 **.NET 10**（`net10.0-windows`），WinForms 界面保持不变。
-> CI 以 `win-x64` 自包含单文件方式发布，产物仍是双击即用的 WinForms exe，
-> 目标机器不需要预装 .NET 桌面运行时。
+> 目标框架是 **.NET 10 + WinUI 3**（`net10.0-windows10.0.19041.0`，Windows App SDK 2.6.5）。
+> 界面使用 Fluent Design：Win11 上 Mica 背景，Win10 1809+ 回退亚克力/纯色；跟随系统明暗主题。
+> CI 以 `win-x64` 自包含单文件方式发布，双击即用，目标机器不需要安装 .NET 或 Windows App SDK 运行时。
+> 单 exe 约 **236MB**，首次启动会把依赖解压到临时目录，之后启动不再解压。
 > 每次 CI 运行产出的 artifact 名为 `DistrictJsonToSql-win-x64`，其中只有 `DistrictJsonToSql.exe` 这一个文件。
 > 开发构建需要 .NET 10 SDK，`dotnet build` / `dotnet test` 即可。
 > JSON 解析依赖 Newtonsoft.Json 13.0.4。
@@ -30,9 +33,15 @@ UUIDv7 主键时间有序，索引写入更友好。**
 在数据库客户端里粘贴几千条 INSERT。这里把这个过程做成了一个拖入文件就能出
 SQL 的小工具。
 
+## 系统要求
+
+- Windows 10 版本 1809（build 17763）或更高，x64
+- 不需要安装 .NET 运行时，也不需要安装 Windows App SDK 运行时
+- Win11 上使用 Mica 背景；Windows 10 上自动回退为亚克力/纯色背景，功能不受影响
+
 ## 使用方式
 
-1. 直接运行 `DistrictJsonToSql.exe`（自包含发布版无需安装 .NET 运行时）；
+1. 直接运行 `DistrictJsonToSql.exe`（自包含单文件，首次启动会先解压依赖，可能需要几秒）；
    从 CI 运行的 artifacts 里下载 `DistrictJsonToSql-win-x64`，解压即得到 `DistrictJsonToSql.exe`；
    自行构建用
    `dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o dist`，
@@ -138,7 +147,8 @@ DistrictJsonToSql/
 ├── .github/workflows/ci.yml                # windows-latest 上构建 + 跑测试
 ├── tests/DistrictJsonToSql.Tests/          # xunit golden / 回归 / 扩展点用例
 └── DistrictJsonToSql/
-    ├── MainForm.cs                         # 界面（选择文件、展示结果）
+    ├── App.xaml / App.xaml.cs               # WinUI 应用入口
+    ├── MainWindow.xaml / MainWindow.xaml.cs # Fluent 界面（Mica / 暗色 / InfoBar / ContentDialog）
     ├── SqlGenerator.cs                     # 递归展开 + 输入校验 + 分批输出
     ├── ISqlDialect.cs / PostgresDialect.cs # 方言扩展点
     ├── IDistrictReader.cs / JsonDistrictReader.cs  # 输入适配
@@ -146,10 +156,7 @@ DistrictJsonToSql/
     ├── DistrictValidationException.cs      # 带节点路径的校验错误
     ├── ErrorLogger.cs                      # 错误详情落盘
     ├── DistrictItem.cs                     # 行政区划节点模型
-    ├── Program.cs                          # 入口点
-    ├── DistrictJsonToSql.csproj            # net10 WinExe（SDK-style）
-    ├── App.config
-    └── Properties/                         # Resources / Settings
+    └── DistrictJsonToSql.csproj            # net10 WinUI 3（SDK-style）
 ```
 
 ## 许可证
