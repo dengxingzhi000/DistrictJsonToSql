@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DistrictJsonToSql.Core", "D
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DistrictJsonToSql.Presentation", "DistrictJsonToSql.Presentation\DistrictJsonToSql.Presentation.csproj", "{6C2F3A4D-8E9B-4C1D-A2F3-7B8C9D0E1F23}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DistrictJsonToSql.Cli", "DistrictJsonToSql.Cli\DistrictJsonToSql.Cli.csproj", "{9D4E5F60-1A2B-4C3D-8E9F-0A1B2C3D4E56}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -27,6 +29,10 @@ Global
 		{6C2F3A4D-8E9B-4C1D-A2F3-7B8C9D0E1F23}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6C2F3A4D-8E9B-4C1D-A2F3-7B8C9D0E1F23}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{6C2F3A4D-8E9B-4C1D-A2F3-7B8C9D0E1F23}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9D4E5F60-1A2B-4C3D-8E9F-0A1B2C3D4E56}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9D4E5F60-1A2B-4C3D-8E9F-0A1B2C3D4E56}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9D4E5F60-1A2B-4C3D-8E9F-0A1B2C3D4E56}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9D4E5F60-1A2B-4C3D-8E9F-0A1B2C3D4E56}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
