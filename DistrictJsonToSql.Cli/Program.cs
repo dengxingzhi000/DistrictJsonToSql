@@ -86,10 +86,12 @@ namespace DistrictJsonToSql.Cli
                 Console.Error.WriteLine("警告：输入里没有行政区划数据，将生成不含 INSERT 的空脚本。");
             }
 
-            string sql;
+            SqlGenerationResult result;
             try
             {
-                sql = SqlGenerator.GenerateSql(districts, SqlGenerator.CreateDialect(options));
+                var dialect = SqlGenerator.CreateDialect(options);
+                // CLI 只需要写全量文件，不保留预览（previewLineLimit = 0）
+                result = SqlGenerator.GenerateSqlToFile(districts, arguments.OutputPath, dialect, 0, null);
             }
             catch (DistrictValidationException ex)
             {
@@ -102,18 +104,13 @@ namespace DistrictJsonToSql.Cli
                 Console.Error.WriteLine("配置错误：" + ex.Message);
                 return ExitCodes.Usage;
             }
-
-            try
-            {
-                SqlGenerator.WriteSqlFile(arguments.OutputPath, sql);
-            }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
             {
                 Console.Error.WriteLine("写入输出失败：" + ex.Message);
                 return ExitCodes.Write;
             }
 
-            Console.Out.WriteLine("已生成 " + CountNodes(districts) + " 个行政区划节点：" + arguments.OutputPath);
+            Console.Out.WriteLine("已生成 " + result.NodeCount + " 个行政区划节点：" + arguments.OutputPath);
             return ExitCodes.Success;
         }
 
@@ -123,36 +120,6 @@ namespace DistrictJsonToSql.Cli
                    || ex is UnauthorizedAccessException
                    || ex is JsonException
                    || ex is ArgumentException;
-        }
-
-        private static int CountNodes(IReadOnlyList<DistrictItem> districts)
-        {
-            var count = 0;
-            foreach (var district in districts)
-            {
-                count += CountNode(district);
-            }
-
-            return count;
-        }
-
-        private static int CountNode(DistrictItem node)
-        {
-            if (node == null)
-            {
-                return 0;
-            }
-
-            var count = 1;
-            if (node.Children != null)
-            {
-                foreach (var child in node.Children)
-                {
-                    count += CountNode(child);
-                }
-            }
-
-            return count;
         }
     }
 }

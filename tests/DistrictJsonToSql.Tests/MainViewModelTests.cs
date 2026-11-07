@@ -196,6 +196,50 @@ namespace DistrictJsonToSql.Tests
         }
 
         [Fact]
+        public async Task Generate_LargeOutput_ShowsPreviewTruncationNotice()
+        {
+            var directory = CreateTempDirectory();
+            try
+            {
+                var json = new System.Text.StringBuilder("[{\"code\":\"11\",\"name\":\"省\",\"children\":[");
+                for (var i = 0; i < 300; i++)
+                {
+                    if (i > 0)
+                    {
+                        json.Append(',');
+                    }
+
+                    json.Append("{\"code\":\"").Append((i + 1).ToString("D4")).Append("\",\"name\":\"市").Append(i).Append("\"}");
+                }
+
+                json.Append("]}]");
+                var jsonPath = WriteJson(directory, json.ToString());
+                var viewModel = CreateViewModel(out var picker, out var dialogs);
+                picker.PathToReturn = jsonPath;
+                await viewModel.SelectFileCommand.ExecuteAsync(null);
+
+                await viewModel.GenerateSqlCommand.ExecuteAsync(null);
+
+                // 301 个节点 / 4 个批次：共 312 行，只预览前 200 行
+                Assert.True(viewModel.HasOutput);
+                Assert.True(viewModel.IsPreviewTruncated);
+                Assert.Equal(312, viewModel.TotalLineCount);
+                Assert.Contains("仅预览前 200 行", viewModel.PreviewNotice);
+                Assert.Equal(200, CountLines(viewModel.SqlText));
+                Assert.False(viewModel.IsBusy);
+                Assert.Empty(dialogs.Errors);
+
+                var sqlPath = Path.ChangeExtension(jsonPath, ".sql");
+                Assert.True(File.Exists(sqlPath));
+                Assert.Equal(312, CountLines(File.ReadAllText(sqlPath)));
+            }
+            finally
+            {
+                Directory.Delete(directory, true);
+            }
+        }
+
+        [Fact]
         public async Task Generate_InvalidBatchSize_ShowsParameterErrorWithoutWriting()
         {
             var directory = CreateTempDirectory();
@@ -245,6 +289,11 @@ namespace DistrictJsonToSql.Tests
             {
                 Directory.Delete(directory, true);
             }
+        }
+
+        private static int CountLines(string text)
+        {
+            return text.Replace("\r\n", "\n").Split('\n').Length - 1;
         }
     }
 }
