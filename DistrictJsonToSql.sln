@@ -5,6 +5,8 @@ VisualStudioVersion = 17.14.36408.4 d17.14
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DistrictJsonToSql", "DistrictJsonToSql\DistrictJsonToSql.csproj", "{44F95324-5F7B-4BDE-803D-5E11E9A2907D}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DistrictJsonToSql.Core", "DistrictJsonToSql.Core\DistrictJsonToSql.Core.csproj", "{B7E1B7B0-5C1E-4B9E-9C0D-8F0C1D2E3F45}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -15,6 +17,10 @@ Global
 		{44F95324-5F7B-4BDE-803D-5E11E9A2907D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{44F95324-5F7B-4BDE-803D-5E11E9A2907D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{44F95324-5F7B-4BDE-803D-5E11E9A2907D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B7E1B7B0-5C1E-4B9E-9C0D-8F0C1D2E3F45}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B7E1B7B0-5C1E-4B9E-9C0D-8F0C1D2E3F45}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B7E1B7B0-5C1E-4B9E-9C0D-8F0C1D2E3F45}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B7E1B7B0-5C1E-4B9E-9C0D-8F0C1D2E3F45}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

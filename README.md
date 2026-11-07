@@ -113,10 +113,10 @@ VALUES
 
 | 扩展点 | 文件 | 说明 |
 | ------ | ---- | ---- |
-| `ISqlDialect` | `DistrictJsonToSql/ISqlDialect.cs` | INSERT 头部、一行 VALUES、批量大小；目前只有 `PostgresDialect` |
-| `IDistrictReader` | `DistrictJsonToSql/IDistrictReader.cs` | 输入适配层；目前只有 `JsonDistrictReader`（pcas-code.json 风格） |
-| `GeneratorOptions` | `DistrictJsonToSql/GeneratorOptions.cs` | 表名、列名、批量大小、方言名，可外置为 JSON |
-| `DistrictValidationException` | `DistrictJsonToSql/DistrictValidationException.cs` | 校验失败时携带节点路径（如 `[0].children[1]`） |
+| `ISqlDialect` | `DistrictJsonToSql.Core/ISqlDialect.cs` | INSERT 头部、一行 VALUES、批量大小；目前只有 `PostgresDialect` |
+| `IDistrictReader` | `DistrictJsonToSql.Core/IDistrictReader.cs` | 输入适配层；目前只有 `JsonDistrictReader`（pcas-code.json 风格） |
+| `GeneratorOptions` | `DistrictJsonToSql.Core/GeneratorOptions.cs` | 表名、列名、批量大小、方言名，可外置为 JSON |
+| `DistrictValidationException` | `DistrictJsonToSql.Core/DistrictValidationException.cs` | 校验失败时携带节点路径（如 `[0].children[1]`） |
 
 ### 外置配置
 
@@ -146,16 +146,18 @@ DistrictJsonToSql/
 ├── LICENSE                                 # MIT
 ├── .github/workflows/ci.yml                # windows-latest 上构建 + 跑测试
 ├── tests/DistrictJsonToSql.Tests/          # xunit golden / 回归 / 扩展点用例
+├── DistrictJsonToSql.Core/                # net10 纯逻辑，无 UI 依赖
+│   ├── SqlGenerator.cs                     # 递归展开 + 输入校验 + 分批输出
+│   ├── ISqlDialect.cs / PostgresDialect.cs # 方言扩展点
+│   ├── IDistrictReader.cs / JsonDistrictReader.cs  # 输入适配
+│   ├── GeneratorOptions.cs                 # 表名 / 列序 / 批量大小配置
+│   ├── DistrictValidationException.cs      # 带节点路径的校验错误
+│   ├── ErrorLogger.cs                      # 错误详情落盘
+│   ├── DistrictItem.cs                     # 行政区划节点模型
+│   └── DistrictJsonToSql.Core.csproj      # net10 类库
 └── DistrictJsonToSql/
     ├── App.xaml / App.xaml.cs               # WinUI 应用入口
     ├── MainWindow.xaml / MainWindow.xaml.cs # Fluent 界面（Mica / 暗色 / InfoBar / ContentDialog）
-    ├── SqlGenerator.cs                     # 递归展开 + 输入校验 + 分批输出
-    ├── ISqlDialect.cs / PostgresDialect.cs # 方言扩展点
-    ├── IDistrictReader.cs / JsonDistrictReader.cs  # 输入适配
-    ├── GeneratorOptions.cs                 # 表名 / 列序 / 批量大小配置
-    ├── DistrictValidationException.cs      # 带节点路径的校验错误
-    ├── ErrorLogger.cs                      # 错误详情落盘
-    ├── DistrictItem.cs                     # 行政区划节点模型
     └── DistrictJsonToSql.csproj            # net10 WinUI 3（SDK-style）
 ```
 
