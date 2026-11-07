@@ -155,6 +155,10 @@ DistrictJsonToSql/
 │   ├── ErrorLogger.cs                      # 错误详情落盘
 │   ├── DistrictItem.cs                     # 行政区划节点模型
 │   └── DistrictJsonToSql.Core.csproj      # net10 类库
+├── DistrictJsonToSql.Presentation/         # net10 ViewModel，不依赖 WinUI（CommunityToolkit.Mvvm）
+│   ├── MainViewModel.cs                    # 选择文件 / 生成 SQL / 状态反馈
+│   ├── IFilePickerService.cs / IDialogService.cs  # 平台能力接口
+│   └── DistrictJsonToSql.Presentation.csproj
 └── DistrictJsonToSql/
     ├── App.xaml / App.xaml.cs               # WinUI 应用入口
     ├── MainWindow.xaml / MainWindow.xaml.cs # Fluent 界面（Mica / 暗色 / InfoBar / ContentDialog）

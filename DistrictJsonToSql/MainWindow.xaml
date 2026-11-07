@@ -47,14 +47,16 @@
                 </Grid.ColumnDefinitions>
 
                 <TextBox x:Name="FilePathBox" Grid.Column="0" IsReadOnly="True"
+                         Text="{Binding SelectedFilePath, Mode=OneWay}"
                          PlaceholderText="尚未选择 JSON 文件"
                          VerticalAlignment="Center" />
 
                 <ProgressRing x:Name="BusyRing" Grid.Column="1" Width="20" Height="20"
-                              IsActive="False" VerticalAlignment="Center" />
+                              IsActive="{Binding IsBusy, Mode=OneWay}"
+                              VerticalAlignment="Center" />
 
                 <Button x:Name="SelectButton" Grid.Column="2"
-                        Click="OnSelectFileClick" MinWidth="132"
+                        Command="{Binding SelectFileCommand}" MinWidth="132"
                         AutomationProperties.Name="选择 JSON 文件">
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <FontIcon Glyph="&#xE8E5;" FontSize="16" />
@@ -64,7 +66,7 @@
 
                 <Button x:Name="GenerateButton" Grid.Column="3"
                         Style="{StaticResource AccentButtonStyle}"
-                        Click="OnGenerateClick" IsEnabled="False" MinWidth="112"
+                        Command="{Binding GenerateSqlCommand}" MinWidth="112"
                         AutomationProperties.Name="生成 SQL">
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <FontIcon Glyph="&#xE768;" FontSize="16" />
@@ -76,7 +78,11 @@
 
         <!-- 状态条：信息 / 成功 / 警告 / 错误，带内建图标 -->
         <InfoBar x:Name="StatusBar" Grid.Row="3" Margin="24,0,24,12"
-                 IsOpen="False" IsClosable="False" Severity="Informational" />
+                 IsOpen="{Binding IsStatusOpen, Mode=OneWay}"
+                 Title="{Binding StatusTitle, Mode=OneWay}"
+                 Message="{Binding StatusMessage, Mode=OneWay}"
+                 Severity="{Binding StatusSeverity, Mode=OneWay, Converter={StaticResource StatusToInfoBarSeverity}}"
+                 IsClosable="False" />
 
         <!-- 输出卡片：空状态与结果共用同一区域 -->
         <Border Grid.Row="4" Margin="24,0,24,24" Padding="16"
@@ -93,6 +99,7 @@
 
                 <Grid Grid.Row="1">
                     <StackPanel x:Name="EmptyState"
+                                Visibility="{Binding ShowEmptyState, Mode=OneWay, Converter={StaticResource BoolToVisibility}}"
                                 HorizontalAlignment="Center" VerticalAlignment="Center"
                                 Spacing="12">
                         <FontIcon Glyph="&#xE8A5;" FontSize="32"
@@ -106,7 +113,9 @@
                                    HorizontalAlignment="Center" />
                     </StackPanel>
 
-                    <TextBox x:Name="SqlOutput" Visibility="Collapsed" IsReadOnly="True"
+                    <TextBox x:Name="SqlOutput" IsReadOnly="True"
+                             Text="{Binding SqlText, Mode=OneWay}"
+                             Visibility="{Binding ShowOutput, Mode=OneWay, Converter={StaticResource BoolToVisibility}}"
                              AcceptsReturn="True" TextWrapping="NoWrap"
                              IsSpellCheckEnabled="False"
                              FontFamily="Consolas"
