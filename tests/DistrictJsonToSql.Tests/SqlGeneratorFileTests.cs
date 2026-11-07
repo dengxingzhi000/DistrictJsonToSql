@@ -84,7 +84,7 @@ namespace DistrictJsonToSql.Tests
                 Assert.True(result.PreviewTruncated);
                 Assert.Equal(200, CountLines(result.PreviewText));
 
-                Assert.True(reporter.Reports.Count > 0);
+                Assert.NotEmpty(reporter.Reports);
                 Assert.Equal(100000, reporter.Last.NodesTotal);
                 Assert.Equal(100000, reporter.Last.NodesDone);
             }
@@ -136,7 +136,7 @@ namespace DistrictJsonToSql.Tests
                 // 带 BOM 也要能读；对象树不变，报错位置仍是 [0].children[0].children[1]
                 File.WriteAllText(path, json, new UTF8Encoding(true));
                 var districts = new JsonDistrictReader().Read(path);
-                Assert.Equal(1, districts.Count);
+                Assert.Single(districts);
 
                 var dialect = new PostgresDialect(new GeneratorOptions());
                 var error = Assert.Throws<DistrictValidationException>(
