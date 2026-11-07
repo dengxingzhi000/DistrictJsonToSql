@@ -17,9 +17,9 @@ namespace DistrictJsonToSql
 
         public MainWindow(MainViewModel viewModel, FilePickerService filePicker, DialogService dialogService)
         {
-            // x:Bind 在 InitializeComponent 里取值，必须先赋值
             ViewModel = viewModel;
             InitializeComponent();
+            DataContext = viewModel;
 
             ExtendsContentIntoTitleBar = true;
             SetTitleBar(AppTitleBar);
