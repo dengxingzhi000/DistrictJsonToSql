@@ -160,7 +160,10 @@ namespace DistrictJsonToSql.Tests
 
                 var sqlPath = Path.ChangeExtension(jsonPath, ".sql");
                 Assert.True(File.Exists(sqlPath));
-                Assert.Equal(viewModel.SqlText, File.ReadAllText(sqlPath));
+                // 预览统一用 CRLF 展示，文件里批次内部仍是 \n；按行尾归一后内容一致
+                Assert.Equal(
+                    NormalizeLineEndings(viewModel.SqlText),
+                    NormalizeLineEndings(File.ReadAllText(sqlPath)));
             }
             finally
             {
@@ -294,6 +297,11 @@ namespace DistrictJsonToSql.Tests
         private static int CountLines(string text)
         {
             return text.Replace("\r\n", "\n").Split('\n').Length - 1;
+        }
+
+        private static string NormalizeLineEndings(string text)
+        {
+            return text.Replace("\r\n", "\n").Replace("\n", Environment.NewLine);
         }
     }
 }
