@@ -49,6 +49,15 @@ SQL 的小工具。
 2. 点击选择按钮，载入行政区划 JSON 文件（仓库自带示例 `pcas-code.json`）
 3. 复制生成的 SQL 到数据库客户端执行
 
+### 命令行（CLI）
+
+```shell
+dotnet run --project DistrictJsonToSql.Cli -- --input pcas-code.json --output district.sql --table public.tb_district --batch 100
+```
+
+参数：`--input`（必填）、`--output`（必填，UTF-8 无 BOM）、`--table`（默认 `public.tb_district`）、`--batch`（默认 100）、`--help`。
+退出码：`0` 成功、`1` 未预期错误、`2` 参数错误、`3` 输入读取失败、`4` 数据校验失败、`5` 输出写入失败；错误信息一律走 stderr，stdout 只放正常输出。
+
 ### 输入 JSON
 
 ```json
@@ -159,6 +168,9 @@ DistrictJsonToSql/
 │   ├── MainViewModel.cs                    # 选择文件 / 生成 SQL / 状态反馈
 │   ├── IFilePickerService.cs / IDialogService.cs  # 平台能力接口
 │   └── DistrictJsonToSql.Presentation.csproj
+├── DistrictJsonToSql.Cli/                  # net10 命令行，复用 Core
+│   ├── Program.cs                          # --input/--output/--table/--batch 与退出码
+│   └── DistrictJsonToSql.Cli.csproj
 └── DistrictJsonToSql/
     ├── App.xaml / App.xaml.cs               # WinUI 应用入口
     ├── MainWindow.xaml / MainWindow.xaml.cs # Fluent 界面（Mica / 暗色 / InfoBar / ContentDialog）

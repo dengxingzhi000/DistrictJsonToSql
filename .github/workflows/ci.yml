@@ -35,6 +35,7 @@ jobs:
         run: |
           dotnet restore DistrictJsonToSql/DistrictJsonToSql.csproj
           dotnet restore tests/DistrictJsonToSql.Tests/DistrictJsonToSql.Tests.csproj
+          dotnet restore DistrictJsonToSql.Cli/DistrictJsonToSql.Cli.csproj
 
       - name: Build app (net10 WinExe)
         run: dotnet build DistrictJsonToSql/DistrictJsonToSql.csproj -c Release --no-restore
@@ -54,6 +55,14 @@ jobs:
 
       - name: Test
         run: dotnet test tests/DistrictJsonToSql.Tests/DistrictJsonToSql.Tests.csproj --no-restore --logger "trx;LogFileName=test-results.trx" --results-directory TestResults
+
+      - name: Build CLI
+        run: dotnet build DistrictJsonToSql.Cli/DistrictJsonToSql.Cli.csproj -c Release --no-restore
+
+      # 真跑 CLI：生成的 SQL 与 golden 比对，并验证 0/2/3/4/5 退出码
+      - name: CLI smoke
+        shell: pwsh
+        run: ./tests/cli-smoke.ps1
 
       # 防止 workflow 变成“空跑”：必须确认 TRX 里真的有用例被执行且至少一个通过。
       - name: Prove tests actually executed
