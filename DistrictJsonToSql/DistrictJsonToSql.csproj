@@ -19,6 +19,9 @@
     <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
     <PublishSingleFile>true</PublishSingleFile>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+
+    <!-- 显式 PerMonitorV2 DPI 感知；单文件发布时清单会嵌入最终 exe（CI 有断言） -->
+    <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
 
   <ItemGroup>
