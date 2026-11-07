@@ -1,0 +1,38 @@
+name: Attach v2.2.0-preview.2 asset
+
+# 一次性：在 GitHub 侧构建 DPI 修复预览版，并把单 exe 直接上传到预发布
+on:
+  push:
+    branches:
+      - "release/preview-ui"
+
+permissions:
+  contents: write
+
+jobs:
+  attach:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Publish single-file exe
+        shell: pwsh
+        run: |
+          dotnet publish DistrictJsonToSql/DistrictJsonToSql.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o dist
+          Get-ChildItem dist | Select-Object Name, Length
+
+      - name: Create prerelease and upload asset
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
+        run: |
+          gh release create v2.2.0-preview.2 --target $env:GITHUB_SHA --prerelease --title "v2.2.0-preview.2（DPI 修复 + 操作区改版预览）" --notes "PerMonitorV2 DPI 修复与操作区改版预览；请在 125%/150% 缩放下复测后再合并 PR #12。"
+          gh release upload v2.2.0-preview.2 dist/DistrictJsonToSql.exe --clobber
+          gh release view v2.2.0-preview.2 --json assets --jq '.assets[] | "ASSET \(.name) \(.size)"'

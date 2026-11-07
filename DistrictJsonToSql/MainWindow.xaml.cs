@@ -25,17 +25,37 @@ namespace DistrictJsonToSql
             ExtendsContentIntoTitleBar = true;
             SetTitleBar(AppTitleBar);
 
-            AppWindow.Resize(new Windows.Graphics.SizeInt32(InitialWidth, InitialHeight));
-            if (AppWindow.Presenter is OverlappedPresenter presenter)
-            {
-                presenter.PreferredMinimumWidth = MinWidth;
-                presenter.PreferredMinimumHeight = MinHeight;
-            }
-
             ApplyBackdrop();
 
             filePicker.AttachWindow(WinRT.Interop.WindowNative.GetWindowHandle(this));
-            RootGrid.Loaded += (sender, e) => dialogService.AttachXamlRoot(RootGrid.XamlRoot);
+            RootGrid.Loaded += (sender, e) =>
+            {
+                dialogService.AttachXamlRoot(RootGrid.XamlRoot);
+                ApplyDpiAwareSizing();
+            };
+        }
+
+        /// <summary>
+        /// AppWindow 的尺寸单位是物理像素。按当前显示器缩放做换算，保证 125%/150% 下
+        /// 初始窗口与最小窗口的逻辑尺寸和 100% 时一致，不会一打开就被挤到最小尺寸。
+        /// </summary>
+        private void ApplyDpiAwareSizing()
+        {
+            var scale = RootGrid.XamlRoot == null ? 1.0 : RootGrid.XamlRoot.RasterizationScale;
+            if (double.IsNaN(scale) || scale <= 0)
+            {
+                scale = 1.0;
+            }
+
+            AppWindow.Resize(new Windows.Graphics.SizeInt32(
+                (int)System.Math.Round(InitialWidth * scale),
+                (int)System.Math.Round(InitialHeight * scale)));
+
+            if (AppWindow.Presenter is OverlappedPresenter presenter)
+            {
+                presenter.PreferredMinimumWidth = (int)System.Math.Round(MinWidth * scale);
+                presenter.PreferredMinimumHeight = (int)System.Math.Round(MinHeight * scale);
+            }
         }
 
         /// <summary>
